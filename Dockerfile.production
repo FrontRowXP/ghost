@@ -132,6 +132,9 @@ ENV GHOST_BUILD_VERSION=${GHOST_BUILD_VERSION}
 USER ghost
 ENV LD_PRELOAD=libjemalloc.so.2
 
+# Qualify the shipped files as the actual runtime user, before deployment.
+RUN node -e "const fs = require('fs'); for (const path of ['index.js', 'scripts/gather-assets.mjs', 'base_content/themes/casper/index.hbs']) fs.accessSync(path, fs.constants.R_OK); require('pg');"
+
 EXPOSE 2368
 
 CMD ["node", "index.js"]
@@ -147,3 +150,5 @@ FROM core AS full
 # both paths first (e.g. `pnpm nx run @tryghost/admin:build`).
 COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX ghost/core/core/built/admin core/built/admin
 COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX ghost/core/core/built/embed-renderer core/built/embed-renderer
+
+RUN node -e "require('fs').accessSync('core/built/admin/index.html', require('fs').constants.R_OK);"

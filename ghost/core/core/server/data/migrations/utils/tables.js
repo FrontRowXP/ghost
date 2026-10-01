@@ -15,6 +15,19 @@ function isDevelopmentOrTesting() {
  * @returns {Promise<string[]>} the other tables with a foreign key to `table`
  */
 async function getReferencingTables(connection, table) {
+  if (connection.client.config.client === 'pg') {
+    const { rows } = await connection.raw(
+      `SELECT DISTINCT child.relname AS name
+       FROM pg_constraint fk
+       JOIN pg_class child ON child.oid = fk.conrelid
+       JOIN pg_class parent ON parent.oid = fk.confrelid
+       JOIN pg_namespace ns ON ns.oid = parent.relnamespace
+       WHERE fk.contype = 'f' AND ns.nspname = current_schema()
+       AND parent.relname = ? AND child.relname <> ?`,
+      [table, table],
+    );
+    return rows.map((row) => row.name);
+  }
   if (DatabaseInfo.isMySQL(connection)) {
     const [rows] = await connection.raw(
       `SELECT DISTINCT TABLE_NAME AS name

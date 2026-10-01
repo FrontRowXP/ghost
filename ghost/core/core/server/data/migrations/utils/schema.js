@@ -136,7 +136,7 @@ async function applyNullableChange(
     } finally {
       await knex.raw('PRAGMA foreign_keys = ON;');
     }
-  } else if (disableForeignKeyChecks) {
+  } else if (disableForeignKeyChecks && DatabaseInfo.isMySQL(knex)) {
     await knex.raw('SET FOREIGN_KEY_CHECKS=0;');
     try {
       await commands[operation](table, column, knex);
@@ -270,6 +270,10 @@ function createRenameColumnMigration(table, from, to, options = {}) {
  * @returns {Promise<boolean>}
  */
 async function isColumnNotNullable(table, column, knex) {
+  if (knex.client.config.client === 'pg') {
+    const info = await knex(table).columnInfo(column);
+    return info && info.nullable === false;
+  }
   if (DatabaseInfo.isSQLite(knex)) {
     const response = await knex.raw('PRAGMA table_info(??)', [table]);
     const columnInfo = response.find((col) => col.name === column);
@@ -289,6 +293,10 @@ async function isColumnNotNullable(table, column, knex) {
  * @returns {Promise<boolean>}
  */
 async function isColumnNullable(table, column, knex) {
+  if (knex.client.config.client === 'pg') {
+    const info = await knex(table).columnInfo(column);
+    return info && info.nullable === true;
+  }
   if (DatabaseInfo.isSQLite(knex)) {
     const response = await knex.raw('PRAGMA table_info(??)', [table]);
     const columnInfo = response.find((col) => col.name === column);

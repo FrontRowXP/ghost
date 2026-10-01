@@ -79,6 +79,12 @@ function configure(dbConfig) {
     }
   }
 
+  if (client === 'pg') {
+    dbConfig.connection.options = [dbConfig.connection.options, '-c timezone=UTC']
+      .filter(Boolean)
+      .join(' ');
+  }
+
   return dbConfig;
 }
 

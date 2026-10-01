@@ -116,5 +116,48 @@ describe('Config Utils', function () {
 
       assert.equal(nconf.get('database:client'), 'better-sqlite3');
     });
+
+    for (const client of ['pg', 'postgres', 'postgresql']) {
+      it(`preserves PostgreSQL server and TLS settings for ${client}`, function () {
+        const connection = {
+          host: 'database.example.test',
+          port: 5432,
+          user: 'ghost',
+          password: 'test-password',
+          database: 'ghost_test',
+          ssl: { rejectUnauthorized: true, ca: 'test-ca' },
+          filename: 'content/data/ghost.db',
+        };
+        const expected = _.omit(_.cloneDeep(connection), 'filename');
+        fakeConfig = { database: { client, connection } };
+
+        configUtils.sanitizeDatabaseProperties(nconf);
+
+        assert.equal(nconf.get('database:client'), 'pg');
+        assert.deepEqual(nconf.get('database:connection'), expected);
+        assert.equal(nconf.get('database:connection:database'), 'ghost_test');
+        assert.equal(nconf.get('database:connection:ssl:rejectUnauthorized'), true);
+      });
+    }
+
+    it('rejects SQLite when the Gather PostgreSQL guard is enabled', function () {
+      const previous = process.env.GATHER_REQUIRE_POSTGRES;
+      process.env.GATHER_REQUIRE_POSTGRES = 'true';
+      try {
+        fakeConfig = {
+          database: { client: 'better-sqlite3', connection: { filename: 'ghost.db' } },
+        };
+        assert.throws(
+          () => configUtils.sanitizeDatabaseProperties(nconf),
+          /requires an explicit PostgreSQL/,
+        );
+      } finally {
+        if (previous === undefined) {
+          delete process.env.GATHER_REQUIRE_POSTGRES;
+        } else {
+          process.env.GATHER_REQUIRE_POSTGRES = previous;
+        }
+      }
+    });
   });
 });

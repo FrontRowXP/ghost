@@ -1,0 +1,111 @@
+diff --git a/lib/database.js b/lib/database.js
+--- a/lib/database.js
++++ b/lib/database.js
+@@ -68,6 +68,13 @@
+ 
+     if (client === 'better-sqlite3') {
+         options.useNullAsDefault = options.useNullAsDefault || false;
++    }
++
++    if (client === 'pg') {
++        delete options.connection.filename;
++        options.connection.options = [options.connection.options, '-c timezone=UTC']
++            .filter(Boolean)
++            .join(' ');
+     }
+ 
+     if (client === 'mysql2') {
+@@ -134,7 +141,12 @@
+     debug('Creating table: migrations');
+ 
+     await connection.schema.createTable('migrations', function (table) {
+-        table.increments().primary();
++        // PostgreSQL serial already supplies the primary key.
++        if (connection.client.config.client === 'pg') {
++            table.increments();
++        } else {
++            table.increments().primary();
++        }
+         table.string('name');
+         table.string('version');
+         table.string('currentVersion');
+@@ -153,6 +165,18 @@
+ ) {
+     const { database: name, ...serverConnection } = dbConfig.connection;
+     const charset = serverConnection.charset || 'utf8mb4';
++
++    // PostgreSQL databases are provisioned by the operator. The application
++    // needs no CREATEDB privilege and must never create another site's database.
++    if (dbConfig.client === 'pg') {
++        const connection = exports.connect(dbConfig, connectionOptions);
++        try {
++            await exports.ensureConnectionWorks(connection);
++        } finally {
++            await connection.destroy();
++        }
++        return;
++    }
+ 
+     // @NOTE: Skip, because sqlite3 is a file based database.
+     if (DatabaseInfo.isSQLiteConfig(dbConfig)) {
+@@ -206,6 +230,24 @@
+ 
+     const connection = options.connection;
+     const dbConfig = options.dbConfig;
++
++    if (dbConfig.client === 'pg') {
++        if (process.env.GHOST_ALLOW_POSTGRES_RESET !== '1' ||
++            !/_(test|dev)(_|$)/.test(dbConfig.connection.database)) {
++            throw new errors.KnexMigrateError({
++                message: 'PostgreSQL reset requires an isolated test/dev database and GHOST_ALLOW_POSTGRES_RESET=1.',
++            });
++        }
++        await connection.transaction(async function (transaction) {
++            const { rows } = await transaction.raw(
++                "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'"
++            );
++            for (const row of rows) {
++                await transaction.raw('DROP TABLE IF EXISTS ?? CASCADE', [row.table_name]);
++            }
++        });
++        return;
++    }
+ 
+     if (DatabaseInfo.isMySQL(connection)) {
+         debug('Drop database: ' + dbConfig.connection.database);
+diff --git a/migrations/add-primary-key-to-lock-table.js b/migrations/add-primary-key-to-lock-table.js
+--- a/migrations/add-primary-key-to-lock-table.js
++++ b/migrations/add-primary-key-to-lock-table.js
+@@ -17,6 +17,21 @@
+  * Adds an primary key index to a table over the given columns.
+  */
+ async function addPrimaryKey(tableName, columns, knex) {
++    if (knex.client.config.client === 'pg') {
++        const { rows } = await knex.raw(
++            `SELECT 1 FROM pg_constraint c
++             JOIN pg_class t ON t.oid = c.conrelid
++             JOIN pg_namespace n ON n.oid = t.relnamespace
++             WHERE c.contype = 'p' AND n.nspname = current_schema() AND t.relname = ?`,
++            [tableName],
++        );
++        if (!rows.length) {
++            await knex.schema.table(tableName, function (table) {
++                table.primary(columns);
++            });
++        }
++        return;
++    }
+     if (DatabaseInfo.isSQLite(knex)) {
+         const primaryKeyExists = await hasPrimaryKeySQLite(tableName, knex);
+ 
+diff --git a/lib/index.js b/lib/index.js
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1193,6 +1193,7 @@
+         if (
+             err.errno === 1 ||
+             err.errno === 1146 ||
++            (err.code === '42P01' && /relation \"migrations\" does not exist/.test(err.message)) ||
+             (err.code === 'SQLITE_ERROR' && /no such table: migrations/.test(err.message))
+         ) {
+             throw new errors.DatabaseIsNotOkError({

@@ -286,7 +286,7 @@ Post = ghostBookshelf.Model.extend(
           };
         }
         return {
-          orderByRaw: `(select AVG(score) from \`members_feedback\` where posts.id = members_feedback.post_id) ${direction}`,
+          orderByRaw: `(select AVG(score) from members_feedback where posts.id = members_feedback.post_id) ${direction}`,
         };
       }
       if (field === 'email.open_rate' && withRelated && withRelated.indexOf('email') > -1) {
@@ -297,7 +297,7 @@ Post = ghostBookshelf.Model.extend(
           // before untracked emails in the posts list.
           orderByRaw: `
                     emails.track_opens desc,
-                    emails.opened_count * 1.0 / emails.email_count * 100 ${direction},
+                    emails.opened_count * 1.0 / NULLIF(emails.email_count, 0) * 100 ${direction},
                     posts.created_at desc`,
           eagerLoad: 'email.open_rate',
         };

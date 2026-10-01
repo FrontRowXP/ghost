@@ -594,6 +594,18 @@ async function hasPrimaryKeySQLite(tableName, transaction = db.knex) {
  * @param {import('knex').Knex} [transaction] - connection object containing knex reference
  */
 async function addPrimaryKey(tableName, columns, transaction = db.knex) {
+  if (transaction.client.config.client === 'pg') {
+    const { rows } = await transaction.raw(
+      `SELECT 1 FROM pg_constraint c
+       JOIN pg_class t ON t.oid = c.conrelid
+       JOIN pg_namespace n ON n.oid = t.relnamespace
+       WHERE c.contype = 'p' AND n.nspname = current_schema() AND t.relname = ?`,
+      [tableName],
+    );
+    if (rows.length) {
+      return;
+    }
+  }
   if (DatabaseInfo.isSQLite(transaction)) {
     const primaryKeyExists = await hasPrimaryKeySQLite(tableName, transaction);
     if (primaryKeyExists) {
@@ -722,6 +734,11 @@ async function getTables(transaction = db.knex) {
   } else if (client === 'mysql2') {
     const response = await transaction.raw("show full tables where Table_type = 'BASE TABLE'");
     return _.map(response[0], (entry) => _.values(entry)[0]);
+  } else if (client === 'pg') {
+    const { rows } = await transaction.raw(
+      "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' ORDER BY table_name",
+    );
+    return rows.map((row) => row.table_name);
   }
 
   return Promise.reject(tpl(messages.noSupportForDatabase, { client: client }));
@@ -740,6 +757,12 @@ async function getIndexes(table, transaction = db.knex) {
   } else if (client === 'mysql2') {
     const response = await transaction.raw(`SHOW INDEXES from ${table}`);
     return _.flatten(_.map(response[0], 'Key_name'));
+  } else if (client === 'pg') {
+    const { rows } = await transaction.raw(
+      'SELECT indexname FROM pg_indexes WHERE schemaname = current_schema() AND tablename = ? ORDER BY indexname',
+      [table],
+    );
+    return rows.map((row) => row.indexname);
   }
 
   return Promise.reject(tpl(messages.noSupportForDatabase, { client: client }));
@@ -756,6 +779,12 @@ async function getColumns(table, transaction = db.knex) {
   } else if (DatabaseInfo.isMySQL(transaction)) {
     const response = await transaction.raw(`SHOW COLUMNS from ${table}`);
     return _.flatten(_.map(response[0], 'Field'));
+  } else if (transaction.client.config.client === 'pg') {
+    const { rows } = await transaction.raw(
+      'SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ? ORDER BY ordinal_position',
+      [table],
+    );
+    return rows.map((row) => row.column_name);
   }
 
   return Promise.reject(

@@ -1,0 +1,23 @@
+[Unit]
+Description=Build and qualify checked Gather main commits
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=gather-operator
+Group=gather-operator
+Environment=XDG_CACHE_HOME=/var/lib/gather-deployer/cache
+ExecStart=/usr/bin/python3 /opt/gather-deployer/watch.py --config /etc/gather-deployer/config.json
+TimeoutStartSec=90min
+CPUQuota=400%
+MemoryMax=12G
+TasksMax=1024
+UMask=0077
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/gather-deployer
+
+[Install]
+WantedBy=multi-user.target

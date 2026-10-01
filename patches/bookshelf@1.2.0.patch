@@ -1,0 +1,16 @@
+diff --git a/lib/relation.js b/lib/relation.js
+index b8e84d8a29aea87e0e8e2985087029e992a2bf0b..0d540ae652545deb0617418aaadbdf62f4ab752d 100644
+--- a/lib/relation.js
++++ b/lib/relation.js
+@@ -260,3 +260,10 @@ const Relation = RelationBase.extend(
+       if (!currentColumns || currentColumns.length === 0) {
+-        knex.distinct(this.targetTableName + '.*');
++        // PostgreSQL rejects DISTINCT combined with row locks. Locked relation
++        // reads retain their primary/pivot columns and the transaction's lock.
++        if (knex.client.config.client === 'pg' && options.transacting &&
++            (options.lock === 'forUpdate' || options.forUpdate)) {
++          knex.columns(this.targetTableName + '.*');
++        } else {
++          knex.distinct(this.targetTableName + '.*');
++        }
+       }

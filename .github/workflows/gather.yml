@@ -38,6 +38,11 @@ jobs:
       - name: Configuration and publishing regression tests
         working-directory: ghost/core
         run: pnpm exec vitest run test/unit/shared/config/utils.test.js test/unit/server/models/post.test.js --maxWorkers=2
+      - name: Private NAS gateway boundary tests
+        working-directory: ghost/core
+        run: node --test scripts/gather-assets.test.mjs
+      - name: Deployment qualification gate tests
+        run: python3 -m unittest discover -s infra/deployer -p test_watch.py
       - name: Build the production frontend and backend
         run: pnpm build:production
       - name: Reject inherited publication workflows

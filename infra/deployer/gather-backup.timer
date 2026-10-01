@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Gather encrypted backup each day
+
+[Timer]
+OnCalendar=*-*-* 03:40:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=gather-backup.service
+
+[Install]
+WantedBy=timers.target

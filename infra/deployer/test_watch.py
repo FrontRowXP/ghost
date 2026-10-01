@@ -14,6 +14,36 @@ OLD = 'b' * 40
 
 
 class QualificationGate(unittest.TestCase):
+    def test_failed_staging_rollout_restores_its_image_without_changing_production(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            acceptance = root/'acceptance.json'
+            acceptance.write_text(json.dumps({'postgresCheckDatabase': {}}))
+            (root/'image-metadata.json').write_text(json.dumps({'containerimage.digest': 'sha256:'+SHA[:32]*2}))
+            config = {'repository': 'fixture', 'node_bin': '/fixture/node', 'registry_config': '/fixture/registry',
+                'acceptance_config': str(acceptance), 'image_repository': 'fixture', 'buildkit_address': 'fixture',
+                'kubectl': 'fixture-kube', 'kubeconfig': '/fixture/kube', 'staging': {'namespace': 'fixture-stage'},
+                'production': {'namespace': 'fixture-production'}, 'production_enabled': True}
+            previous = 'fixture@sha256:'+OLD[:32]*2
+            calls = []
+            failed = False
+            def operation(args, **kwargs):
+                nonlocal failed
+                calls.append(args)
+                if 'get' in args and 'deployment/gather' in args:
+                    return previous
+                if 'rollout' in args and 'fixture-stage' in args and not failed:
+                    failed = True
+                    raise RuntimeError('staging image unreadable')
+                return None
+            with patch.object(watch, 'run', side_effect=operation):
+                with self.assertRaisesRegex(RuntimeError, 'staging image unreadable'):
+                    watch.promote(config, root, SHA, {})
+            updates = [args for args in calls if 'set' in args and 'image' in args]
+            self.assertTrue(any('gather='+previous in args for args in updates))
+            self.assertTrue(any('gather-assets='+previous in args for args in updates))
+            self.assertFalse(any('fixture-production' in args for args in updates))
+
     def test_failed_ci_never_reaches_build_or_deployment(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -112,7 +112,9 @@ WORKDIR /home/ghost
 # The deploy stage produced a self-contained app dir (server source + resolved
 # node_modules, no admin). Copy it once with its final ownership — no separate
 # `chown -R` layer, so node_modules isn't duplicated in the image.
-COPY --chown=nobody:nogroup --from=deploy /home/ghost ./
+# Set exported public code permissions during COPY so private worker umasks
+# cannot make it unreadable. Preserve executable files and directory traversal.
+COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX --from=deploy /home/ghost ./
 
 # cp -a preserves the nobody:nogroup ownership set at COPY time, so base_content
 # and default need no re-chown; only the writable content/log dirs flip to ghost.
@@ -130,6 +132,9 @@ ENV GHOST_BUILD_VERSION=${GHOST_BUILD_VERSION}
 USER ghost
 ENV LD_PRELOAD=libjemalloc.so.2
 
+# Qualify the shipped files as the actual runtime user, before deployment.
+RUN node -e "const fs = require('fs'); for (const path of ['index.js', 'scripts/gather-assets.mjs', 'base_content/themes/casper/index.hbs']) fs.accessSync(path, fs.constants.R_OK); require('pg');"
+
 EXPOSE 2368
 
 CMD ["node", "index.js"]
@@ -143,5 +148,7 @@ FROM core AS full
 # build job) under ghost/core/core/built — the deploy stage excludes that path,
 # so this is the only stage that carries them. Local `full` builds must populate
 # both paths first (e.g. `pnpm nx run @tryghost/admin:build`).
-COPY --chown=nobody:nogroup ghost/core/core/built/admin core/built/admin
-COPY --chown=nobody:nogroup ghost/core/core/built/embed-renderer core/built/embed-renderer
+COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX ghost/core/core/built/admin core/built/admin
+COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX ghost/core/core/built/embed-renderer core/built/embed-renderer
+
+RUN node -e "require('fs').accessSync('core/built/admin/index.html', require('fs').constants.R_OK);"

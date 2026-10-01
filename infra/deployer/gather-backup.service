@@ -1,0 +1,22 @@
+[Unit]
+Description=Create and verify an encrypted Gather database and NAS backup
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/var/lib/gather-deployer/source/infra/deployer/backup.mjs
+
+[Service]
+Type=oneshot
+User=gather-operator
+Group=gather-operator
+Environment=GNUPGHOME=/var/lib/gather-deployer/gpg
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/env node /var/lib/gather-deployer/source/infra/deployer/backup.mjs /etc/gather-deployer/qualification.json
+TimeoutStartSec=20min
+CPUQuota=200%
+MemoryMax=2G
+TasksMax=128
+UMask=0077
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/gather-deployer

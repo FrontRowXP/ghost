@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Gather main for a new qualified release
+
+[Timer]
+OnBootSec=120s
+OnUnitInactiveSec=120s
+Persistent=true
+Unit=gather-deployer.service
+
+[Install]
+WantedBy=timers.target

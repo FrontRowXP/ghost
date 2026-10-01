@@ -805,6 +805,7 @@ pnpmfileChecksum: sha256-fUIu4zcFUYGAp3jCvRqZ8zssQmWG4cCy4lRG7lA7cvQ=
 patchedDependencies:
   '@elastic/elasticsearch@8.19.2': 725142a9606e50dff3ed4c17fb9256d5457c7c75ce262898b87ef0ffff14dcc2
   aria-hidden@1.2.6: 0ad169c5dde1d489b721bf506266c5aec2fe212b2ca97daa6caccee450d8dd5b
+  bookshelf@1.2.0: ea384316f816cd8dcdd04554051d91dff55cf68a1029174a6d4d607edb5e84f5
   juice@11.1.1: 9b56fcd925d7de8dd73a700a918dcb387ef39410581a11d9ac683b3eed9790d0
   knex-migrator@6.2.1: 1ae30eff223f86258f07cd0c0169f825247f35e896e4e79406a78e3f753891a3
 
@@ -2684,10 +2685,10 @@ importers:
         version: 1.20.8(supports-color@10.2.2)
       bookshelf:
         specifier: 1.2.0
-        version: 1.2.0(knex@2.4.2(better-sqlite3@12.11.1)(mysql2@3.24.4(@types/node@22.20.1))(pg@8.16.3)(supports-color@10.2.2))
+        version: 1.2.0(patch_hash=ea384316f816cd8dcdd04554051d91dff55cf68a1029174a6d4d607edb5e84f5)(knex@2.4.2(better-sqlite3@12.11.1)(mysql2@3.24.4(@types/node@22.20.1))(pg@8.16.3)(supports-color@10.2.2))
       bookshelf-relations:
         specifier: 3.0.0
-        version: 3.0.0(bookshelf@1.2.0(knex@2.4.2(better-sqlite3@12.11.1)(mysql2@3.24.4(@types/node@22.20.1))(pg@8.16.3)(supports-color@10.2.2)))(supports-color@10.2.2)
+        version: 3.0.0(bookshelf@1.2.0(patch_hash=ea384316f816cd8dcdd04554051d91dff55cf68a1029174a6d4d607edb5e84f5)(knex@2.4.2(better-sqlite3@12.11.1)(mysql2@3.24.4(@types/node@22.20.1))(pg@8.16.3)(supports-color@10.2.2)))(supports-color@10.2.2)
       bson-objectid:
         specifier: 'catalog:'
         version: 2.0.4
@@ -31590,17 +31591,17 @@ snapshots:
       fast-safe-stringify: 2.1.1
       individual: 3.0.0
 
-  bookshelf-relations@3.0.0(bookshelf@1.2.0(knex@2.4.2(better-sqlite3@12.11.1)(mysql2@3.24.4(@types/node@22.20.1))(pg@8.16.3)(supports-color@10.2.2)))(supports-color@10.2.2):
+  bookshelf-relations@3.0.0(bookshelf@1.2.0(patch_hash=ea384316f816cd8dcdd04554051d91dff55cf68a1029174a6d4d607edb5e84f5)(knex@2.4.2(better-sqlite3@12.11.1)(mysql2@3.24.4(@types/node@22.20.1))(pg@8.16.3)(supports-color@10.2.2)))(supports-color@10.2.2):
     dependencies:
       '@tryghost/debug': 2.3.16(supports-color@10.2.2)
       '@tryghost/errors': 3.4.1
       bluebird: 3.7.2
-      bookshelf: 1.2.0(knex@2.4.2(better-sqlite3@12.11.1)(mysql2@3.24.4(@types/node@22.20.1))(pg@8.16.3)(supports-color@10.2.2))
+      bookshelf: 1.2.0(patch_hash=ea384316f816cd8dcdd04554051d91dff55cf68a1029174a6d4d607edb5e84f5)(knex@2.4.2(better-sqlite3@12.11.1)(mysql2@3.24.4(@types/node@22.20.1))(pg@8.16.3)(supports-color@10.2.2))
       lodash: 4.18.1
     transitivePeerDependencies:
       - supports-color
 
-  bookshelf@1.2.0(knex@2.4.2(better-sqlite3@12.11.1)(mysql2@3.24.4(@types/node@22.20.1))(pg@8.16.3)(supports-color@10.2.2)):
+  bookshelf@1.2.0(patch_hash=ea384316f816cd8dcdd04554051d91dff55cf68a1029174a6d4d607edb5e84f5)(knex@2.4.2(better-sqlite3@12.11.1)(mysql2@3.24.4(@types/node@22.20.1))(pg@8.16.3)(supports-color@10.2.2)):
     dependencies:
       bluebird: 3.7.2
       create-error: 0.3.1

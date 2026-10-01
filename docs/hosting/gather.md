@@ -39,3 +39,55 @@ Upstream workflow definitions are retained under `.github/upstream-workflows/`
 for reference. They are inactive. The active workflow lives in
 `.github/workflows/gather.yml` and never publishes upstream packages or modifies
 upstream services.
+
+## Kubernetes and private NAS delivery
+
+Render the Kubernetes resources with `infra/kubernetes/render.py`. Supply the
+namespace, hostname, immutable image, external data host addresses and eligible
+node names. The renderer creates application workloads only. Project
+`gather-runtime`, `gather-assets`, `gather-registry` and `gather-origin-tls` from
+the local credential store before applying it.
+
+Core is a singleton using the Recreate strategy. The matching Admin and default
+themes are shipped in the same image. Themes are release-managed and mounted
+read-only; install custom themes through reviewed image changes. Admin theme
+uploads cannot persist in this deployment. Route settings and redirects use S3.
+
+The separate asset gateway has only S3 GetObject access to images, media and
+files. It rejects other prefixes and validates an origin credential for the
+ingress ForwardAuth middleware. Keep buckets private, verify the origin TLS
+certificate at the CDN, and overwrite the origin header at the edge. Start
+with CDN pass-through for the application/API until cache invalidation is
+qualified. Uploaded assets carry a 60-second browser cache lifetime.
+
+Ghost's settings cache uses synchronous reads and must retain the process-local
+MemoryCache adapter. Use external Redis for supported asynchronous cache
+features. This does not require a Redis server in any application pod.
+
+## Deployment after merges
+
+The trusted `infra/deployer/watch.py` worker checks for a new main SHA every two
+minutes. It requires a successful main push run of Gather checks, checks out
+that exact SHA, builds/tests on infrastructure, pushes an immutable image, and
+runs authenticated staging acceptance before promotion. Production commissioning
+must explicitly enable promotion in the private operator configuration.
+
+The acceptance lane publishes and unpublishes a disposable post and verifies
+image, file, multipart video and byte-range delivery. It removes its own test
+post and upload objects afterward. A failed production check restores the
+previous image; it never automatically reverses a database migration. Review
+schema compatibility and restore procedures before every schema change.
+
+Before promotion, the backup lane creates an encrypted PostgreSQL and NAS
+snapshot, verifies the uploaded encrypted bytes, and retains a protected second
+copy. Snapshots have a 2 GiB plaintext bound and require 20 GiB free disk space;
+exceeding either limit stops promotion. Store the encryption passphrase and
+scoped backup credentials in the local credential store. Rehearse decryption,
+PostgreSQL restore and asset recovery independently; byte verification alone
+does not prove restore readiness.
+
+Install the supplied systemd units with a reviewed operator account override.
+Give its Kubernetes identity access to the Gather deployments only, keep
+configuration files private, and retain the existing GitHub App wrapper for
+Actions reads. The worker updates application images; changes to networking,
+credential projection or infrastructure require the operator deployment path.

@@ -31,6 +31,7 @@
     "!content/themes/source/pnpm-lock.yaml",
     "bin/",
     "scripts/prune.mts",
+    "scripts/gather-assets.mjs",
     "types/",
     "index.js",
     "loggingrc.js",

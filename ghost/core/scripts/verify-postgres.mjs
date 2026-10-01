@@ -45,6 +45,33 @@ try {
 
   const transaction = await knex.transaction();
   try {
+    const bookshelf = require('bookshelf')(knex);
+    const Author = bookshelf.Model.extend({ tableName: 'users' });
+    const Post = bookshelf.Model.extend({
+      tableName: 'posts',
+      authors() {
+        return this.belongsToMany(Author, 'posts_authors', 'post_id', 'author_id').withPivot(['id', 'sort_order']);
+      },
+    });
+    const relation = await transaction('posts_authors').first();
+    assert.ok(relation, 'An initialized fixture must include a post author');
+    const post = await Post.forge({ id: relation.post_id }).fetch({
+      transacting: transaction, lock: 'forUpdate', withRelated: ['authors'],
+    });
+    assert.ok(post.related('authors').length > 0);
+    const authorIds = post.related('authors').pluck('id');
+    assert.equal(new Set(authorIds).size, authorIds.length);
+    const competing = await knex.transaction();
+    try {
+      await assert.rejects(
+        competing('posts').where({ id: relation.post_id }).forUpdate().noWait().first(),
+        error => error.code === '55P03',
+      );
+    } finally {
+      await competing.rollback();
+    }
+    console.log('Locked post/author relation and competing row lock exclusion: passed');
+
     await transaction('automations').insert({
       id: '000000000000000000000001',
       name: 'Gather migration acceptance',

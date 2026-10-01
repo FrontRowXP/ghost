@@ -91,3 +91,9 @@ Give its Kubernetes identity access to the Gather deployments only, keep
 configuration files private, and retain the existing GitHub App wrapper for
 Actions reads. The worker updates application images; changes to networking,
 credential projection or infrastructure require the operator deployment path.
+
+The optional `gather-backup.timer` also runs the encrypted snapshot daily at
+03:40 UTC, with up to five minutes of jitter. Override its operator account and
+Node executable path to use the pinned runtime. Check the first real run before
+enabling the timer and monitor service failures and disk reserve. Retention is
+operator-managed; the backup identity cannot delete snapshots.

@@ -101,7 +101,7 @@ def promote(config, root, sha, state):
     if not re.fullmatch('sha256:[0-9a-f]{64}', digest):
         raise RuntimeError('BuildKit returned an invalid image digest')
     image = config['image_repository']+'@'+digest
-    kube = [config['kubectl'], '--kubeconfig', config['kubeconfig']]
+    kube = [config['kubectl'], '--kubeconfig', config['kubeconfig'], '--cache-dir', str(root/'cache/kubectl')]
     def deploy(lane, target):
         ns = config[lane]['namespace']
         run([*kube, '-n', ns, 'set', 'image', 'deployment/gather', 'gather='+target, 'bundled-content='+target])

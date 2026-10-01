@@ -109,8 +109,14 @@ def promote(config, root, sha, state):
         for name in ['gather', 'gather-assets']:
             run([*kube, '-n', ns, 'rollout', 'status', 'deployment/'+name, '--timeout=300s'])
     previous = state.get('image') or run([*kube, '-n', config['production']['namespace'], 'get', 'deployment/gather', '-o', 'jsonpath={.spec.template.spec.containers[0].image}'], capture=True)
-    deploy('staging', image)
-    run([config['node_bin']+'/node', str(checkout/'infra/deployer/acceptance.mjs'), '--config', str(Path(config['acceptance_config'])), '--lane', 'staging'], cwd=core, env=env)
+    previous_staging = run([*kube, '-n', config['staging']['namespace'], 'get', 'deployment/gather', '-o', 'jsonpath={.spec.template.spec.containers[0].image}'], capture=True)
+    try:
+        deploy('staging', image)
+        run([config['node_bin']+'/node', str(checkout/'infra/deployer/acceptance.mjs'), '--config', str(Path(config['acceptance_config'])), '--lane', 'staging'], cwd=core, env=env)
+    except Exception:
+        deploy('staging', previous_staging)
+        print('Staging restored to its previous image after failed qualification.', flush=True)
+        raise
     state['staging_sha'] = sha
     state['staging_image'] = image
     if not config.get('production_enabled', False):

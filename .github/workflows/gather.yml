@@ -1,0 +1,46 @@
+name: Gather checks
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'gather/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gather-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compatibility:
+    name: Gather compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NX_DAEMON: 'false'
+      NX_NATIVE_COMMAND_RUNNER: 'false'
+      NX_PARALLEL: '2'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          node-version: 22.23.3
+          install: 'false'
+      - name: Bootstrap the pinned workspace
+        run: pnpm bootstrap
+      - name: Build production dependencies
+        run: pnpm --filter-prod 'ghost^...' -r run build
+      - name: Configuration and publishing regression tests
+        working-directory: ghost/core
+        run: pnpm exec vitest run test/unit/shared/config/utils.test.js test/unit/server/models/post.test.js --maxWorkers=2
+      - name: Build the production frontend and backend
+        run: pnpm build:production
+      - name: Reject inherited publication workflows
+        run: |
+          unexpected=$(find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) ! -name gather.yml)
+          test -z "$unexpected"

@@ -10,7 +10,11 @@ module.exports = {
   async down(config) {
     logging.info('Backfilling null automations.slug values with random IDs');
     const connection = config.transacting || config.connection;
-    const randomId = DatabaseInfo.isSQLite(connection) ? 'hex(randomblob(64))' : 'UUID()';
+    const randomId = DatabaseInfo.isSQLite(connection)
+      ? 'hex(randomblob(64))'
+      : connection.client.config.client === 'pg'
+        ? 'gen_random_uuid()::text'
+        : 'UUID()';
     await connection('automations').whereNull('slug').update('slug', connection.raw(randomId));
 
     logging.info('Making automations.slug required');

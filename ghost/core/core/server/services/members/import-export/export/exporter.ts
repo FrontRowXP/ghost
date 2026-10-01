@@ -286,16 +286,20 @@ export default class MembersCSVExporter {
     activeMetafields: MetafieldDefinition[],
   ): Promise<BatchRelatedData> {
     const knex = this._knex;
+    const aggregateIds = (column: string, alias: string) =>
+      knex.client.config.client === 'pg'
+        ? knex.raw("string_agg(??::text, ',') as ??", [column, alias])
+        : knex.raw('GROUP_CONCAT(??) as ??', [column, alias]);
 
     const [tiers, labels, stripeCustomers, subscriptions, gifts, metafieldValuesMap] =
       await Promise.all([
         knex('members_products')
-          .select('member_id', knex.raw('GROUP_CONCAT(product_id) as tiers'))
+          .select('member_id', aggregateIds('product_id', 'tiers'))
           .whereIn('member_id', memberIds)
           .groupBy('member_id'),
 
         knex('members_labels')
-          .select('member_id', knex.raw('GROUP_CONCAT(label_id) as labels'))
+          .select('member_id', aggregateIds('label_id', 'labels'))
           .whereIn('member_id', memberIds)
           .groupBy('member_id'),
 

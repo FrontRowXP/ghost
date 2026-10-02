@@ -78,6 +78,10 @@ export function createGateway({ client, bucket, originSecret }) {
       if (request.method === 'HEAD') response.end();
       else await pipeline(object.Body, response);
     } catch (error) {
+      console.error(JSON.stringify({ event: 'gather_asset_failure',
+        name: /^[A-Za-z0-9_$]+$/.test(error.name || '') ? error.name : 'StorageError',
+        storageStatus: error.$metadata?.httpStatusCode ?? null,
+        attempts: error.$metadata?.attempts ?? null, headersSent: response.headersSent }));
       if (response.headersSent) {
         response.destroy();
         return;

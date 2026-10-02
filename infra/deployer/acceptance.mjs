@@ -54,8 +54,12 @@ async function upload(kind, bytes, extension, mime) {
     const url = new URL(result[kind][0].url);
     if (url.origin !== new URL(lane.url).origin || !url.pathname.startsWith(`/_assets/content/${kind}/`) || !url.pathname.includes(identifier)) throw new Error('Upload escaped the Gather asset namespace');
     uploads.push({kind, url});
+    const started = Date.now();
     const response = await fetch(url, {signal: AbortSignal.timeout(90000)});
-    if (response.status !== 200 || response.headers.get('content-type') !== mime) throw new Error('Public NAS asset delivery failed');
+    if (response.status !== 200 || response.headers.get('content-type') !== mime) {
+        await response.body?.cancel();
+        throw new Error(`Public NAS ${kind} delivery failed: status=${response.status}, type=${response.headers.get('content-type')}, elapsedMs=${Date.now() - started}`);
+    }
     const delivered = Buffer.from(await response.arrayBuffer());
     if (kind === 'images') {
         if (!delivered.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) throw new Error('PNG delivery failed');

@@ -31,6 +31,11 @@ export function createGateway({ client, bucket, originSecret }) {
         response.end();
         return;
       }
+      const supplied = Buffer.from(request.headers['x-gather-origin-key'] || '');
+      if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
+        response.writeHead(403, {'Cache-Control': 'no-store'}).end();
+        return;
+      }
       let key;
       try {
         if (!path.startsWith('/_assets/')) {

@@ -11,6 +11,11 @@ module.exports = function setupParentApp() {
   debug('ParentApp setup start');
   const parentApp = express('parent');
 
+  parentApp.use(mw.gatherOrigin({
+    secret: config.get('security:gatherOriginSecret'),
+    required: process.env.GATHER_REQUIRE_ORIGIN === 'true',
+  }));
+
   parentApp.use(mw.requestId);
 
   if (config.get('queryParameterFiltering:enabled')) {

@@ -28,8 +28,9 @@ def render(namespace, hostname, image, database_host, redis_host, storage_host, 
             'volumeMounts': [{'name': 'tmp', 'mountPath': '/tmp'}, {'name': 'config', 'mountPath': config_path, 'subPath': filename, 'readOnly': True}],
             'livenessProbe': {'tcpSocket': {'port': 'http'}, 'initialDelaySeconds': 60, 'periodSeconds': 20}}
         if core:
+            container['env'].append({'name': 'GATHER_REQUIRE_ORIGIN', 'value': 'true'})
             container['volumeMounts'] += [{'name': 'content', 'mountPath': '/home/ghost/content'}, {'name': 'content', 'mountPath': '/home/ghost/content/themes', 'subPath': 'themes', 'readOnly': True}]
-            container['readinessProbe'] = {'httpGet': {'path': '/ghost/api/admin/site/', 'port': 'http', 'httpHeaders': [{'name': 'X-Forwarded-Proto', 'value': 'https'}]}, 'periodSeconds': 10, 'timeoutSeconds': 5}
+            container['readinessProbe'] = {'exec': {'command': ['node', 'scripts/gather-ready.mjs']}, 'periodSeconds': 10, 'timeoutSeconds': 5}
             container['startupProbe'] = {'tcpSocket': {'port': 'http'}, 'failureThreshold': 60, 'periodSeconds': 5}
         else:
             container['command'] = ['node', 'scripts/gather-assets.mjs']
@@ -43,9 +44,8 @@ def render(namespace, hostname, image, database_host, redis_host, storage_host, 
             pod['initContainers'] = [{'name': 'bundled-content', 'image': image, 'securityContext': csecurity, 'command': ['sh', '-ec', 'cp -R /home/ghost/base_content/. /content/'], 'volumeMounts': [{'name': 'content', 'mountPath': '/content'}], 'resources': {'requests': {'cpu': '50m', 'memory': '64Mi'}, 'limits': {'cpu': '1', 'memory': '256Mi'}}}]
         resource('apps/v1', 'Deployment', name, spec={'replicas': replicas, 'strategy': {'type': 'Recreate'} if core else {'type': 'RollingUpdate'}, 'selector': {'matchLabels': labels}, 'template': {'metadata': {'labels': labels}, 'spec': pod}})
         resource('v1', 'Service', name, spec={'selector': labels, 'ports': [{'name': 'http', 'port': port, 'targetPort': 'http'}]})
-    resource('traefik.io/v1alpha1', 'Middleware', 'gather-origin', spec={'forwardAuth': {'address': f'http://gather-assets.{namespace}.svc.cluster.local:8080/__gather-origin-auth', 'trustForwardHeader': False, 'authRequestHeaders': ['X-Gather-Origin-Key']}})
     ingress = resource('networking.k8s.io/v1', 'Ingress', 'gather', spec={'ingressClassName': 'public', 'tls': [{'hosts': [hostname], 'secretName': 'gather-origin-tls'}], 'rules': [{'host': hostname, 'http': {'paths': [{'path': '/_assets/', 'pathType': 'Prefix', 'backend': {'service': {'name': 'gather-assets', 'port': {'number': 8080}}}}, {'path': '/', 'pathType': 'Prefix', 'backend': {'service': {'name': 'gather', 'port': {'number': 2368}}}}]}}]})
-    ingress['metadata']['annotations'] = {'traefik.ingress.kubernetes.io/router.middlewares': namespace+'-gather-origin@kubernetescrd', 'traefik.ingress.kubernetes.io/router.entrypoints': 'websecure', 'traefik.ingress.kubernetes.io/router.tls': 'true'}
+    ingress['metadata']['annotations'] = {'traefik.ingress.kubernetes.io/router.entrypoints': 'websecure', 'traefik.ingress.kubernetes.io/router.tls': 'true'}
     external = []
     for host, ports in [(database_host, [5432]), (redis_host, [6379]), (storage_host, [9000])]:
         external.append({'to': [{'ipBlock': {'cidr': str(ipaddress.ip_address(host))+'/32'}}], 'ports': [{'protocol': 'TCP', 'port': port} for port in ports]})

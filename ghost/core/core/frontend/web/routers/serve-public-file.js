@@ -195,6 +195,17 @@ function servePublicFiles(siteApp) {
     ),
   );
 
+  // Gather's bundled search files; expose only these two release-managed assets.
+  for (const [file, mime] of [
+    ['sodo-search.min.js', 'application/javascript'],
+    ['main.css', 'text/css'],
+  ]) {
+    siteApp.get(
+      `/public/gather-search/${file}`,
+      createPublicFileMiddleware('static', `public/gather-search/${file}`, mime, 60),
+    );
+  }
+
   // Card assets (assembled in memory per active theme)
   siteApp.get(
     '/public/cards.min.css',

@@ -67,6 +67,12 @@ async function upload(kind, bytes, extension, mime) {
 }
 try {
     await request('/ghost/api/admin/site/', {authenticated: false});
+    for (const [file, mime] of [['sodo-search.min.js', 'application/javascript'], ['main.css', 'text/css']]) {
+        const asset = await request(`/public/gather-search/${file}`, {authenticated: false});
+        if (!asset.headers.get('content-type')?.startsWith(mime) || (await asset.arrayBuffer()).byteLength < 100) {
+            throw new Error('Bundled search asset delivery failed');
+        }
+    }
     post = (await (await request('/ghost/api/admin/posts/?source=html', {method: 'POST', expected: 201,
         body: JSON.stringify({posts: [{title: 'Gather deployment acceptance', slug: identifier, html: '<p>Gather release acceptance.</p>', status: 'published'}]})})).json()).posts[0];
     const contentPath = `/ghost/api/content/posts/slug/${identifier}/?key=${encodeURIComponent(lane.contentKey)}`;
@@ -87,7 +93,7 @@ try {
     if (new Set(post.authors.map(author => author.id)).size !== post.authors.length) throw new Error('Concurrent edits duplicated post authors');
     await request(`/ghost/api/admin/posts/${post.id}/`, {method: 'PUT', body: JSON.stringify({posts: [{updated_at: post.updated_at, status: 'draft'}]})});
     await request(contentPath, {expected: 404, authenticated: false});
-    console.log(`Gather ${args.lane} acceptance passed: publishing, concurrent edit exclusion, unpublishing, images, multipart video, files and byte ranges.`);
+    console.log(`Gather ${args.lane} acceptance passed: bundled search, publishing, concurrent edit exclusion, unpublishing, images, multipart video, files and byte ranges.`);
 } finally {
     if (post) await request(`/ghost/api/admin/posts/${post.id}/`, {method: 'DELETE', expected: 204});
     const require = createRequire(new URL('../../ghost/core/package.json', import.meta.url));

@@ -2,6 +2,7 @@ import {readFile} from 'node:fs/promises';
 import {createHmac, randomUUID} from 'node:crypto';
 import {deflateSync} from 'node:zlib';
 import {createRequire} from 'node:module';
+import {setTimeout as pause} from 'node:timers/promises';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((out, value, index, all) => {
     if (value.startsWith('--')) out.push([value.slice(2), all[index + 1]]);
@@ -19,6 +20,31 @@ const token = `${signingInput}.${createHmac('sha256', Buffer.from(secret, 'hex')
 const identifier = `gather-acceptance-${randomUUID()}`;
 let post;
 const uploads = [];
+// Pod readiness precedes propagation through ingress and the CDN. Probe reads
+// before creating acceptance data; publishing/upload requests are never retried.
+async function waitForPublicRoutes() {
+    const deadline = Date.now() + 90000;
+    let stable = 0;
+    while (Date.now() < deadline) {
+        try {
+            for (const path of ['/ghost/api/admin/site/', '/public/gather-search/sodo-search.min.js',
+                '/public/gather-search/main.css', '/_assets/content/images/.gather-health']) {
+                const response = await fetch(new URL(path, lane.url), {signal: AbortSignal.timeout(10000)});
+                await response.body?.cancel();
+                if (response.status !== 200) throw new Error(`${path} status=${response.status}`);
+            }
+            if (++stable === 3) {
+                console.log('Public Core, frontend and NAS routes converged before write qualification.');
+                return;
+            }
+        } catch (error) {
+            stable = 0;
+            console.log(`Waiting for public route propagation: ${error.message}`);
+        }
+        await pause(3000);
+    }
+    throw new Error('Public routes did not converge within 90 seconds; no acceptance data was created');
+}
 async function request(path, {method = 'GET', body, expected = 200, authenticated = true} = {}) {
     const response = await fetch(new URL(path, lane.url), {
         method, body, headers: {Origin: lane.url, 'Accept-Version': 'v6.0',
@@ -70,6 +96,7 @@ async function upload(kind, bytes, extension, mime) {
     }
 }
 try {
+    await waitForPublicRoutes();
     await request('/ghost/api/admin/site/', {authenticated: false});
     for (const [file, mime] of [['sodo-search.min.js', 'application/javascript'], ['main.css', 'text/css']]) {
         const asset = await request(`/public/gather-search/${file}`, {authenticated: false});

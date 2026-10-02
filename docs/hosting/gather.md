@@ -75,6 +75,12 @@ Review the starter social account links before publishing the site. Payments,
 newsletters, analytics and federation require separate acceptance before enabling
 their visitor controls.
 
+The full image includes the pinned site-search app at
+`/public/gather-search/sodo-search.min.js` and its sibling `main.css`. Configure
+`sodoSearch.url` and `sodoSearch.styles` to those URLs on the site's own origin.
+Build it with `pnpm --filter @tryghost/sodo-search run build` before building the
+full Docker image. Verify the search dialog in the browser after deployment.
+
 Ghost's settings cache uses synchronous reads and must retain the process-local
 MemoryCache adapter. Use external Redis for supported asynchronous cache
 features. This does not require a Redis server in any application pod.

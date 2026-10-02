@@ -150,5 +150,6 @@ FROM core AS full
 # both paths first (e.g. `pnpm nx run @tryghost/admin:build`).
 COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX ghost/core/core/built/admin core/built/admin
 COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX ghost/core/core/built/embed-renderer core/built/embed-renderer
+COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX apps/sodo-search/umd core/frontend/public/gather-search
 
-RUN node -e "require('fs').accessSync('core/built/admin/index.html', require('fs').constants.R_OK);"
+RUN node -e "const fs = require('fs'); for (const path of ['core/built/admin/index.html', 'core/frontend/public/gather-search/sodo-search.min.js', 'core/frontend/public/gather-search/main.css']) fs.accessSync(path, fs.constants.R_OK);"

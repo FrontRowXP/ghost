@@ -57,10 +57,23 @@ The separate asset gateway has only S3 GetObject access to images, media and
 files. It rejects other prefixes and validates the origin credential on asset
 requests. Core validates the same locally projected credential before routing
 requests. Its authenticated readiness probe reads the credential from the mounted
-configuration; credentials never appear in the rendered resources. Keep buckets private, verify the origin TLS
+configuration. Project the same strong per-environment value into Core's
+`security.gatherOriginSecret` and the gateway's `assets.originSecret`.
+`GATHER_REQUIRE_ORIGIN=true` makes missing or weak Core credentials a startup
+error. Credentials never appear in the rendered resources. Keep buckets private, verify the origin TLS
 certificate at the CDN, and overwrite the origin header at the edge. Start
 with CDN pass-through for the application/API until cache invalidation is
 qualified. Uploaded assets carry a 60-second browser cache lifetime.
+
+When replacing a prior ingress authorization middleware, keep that middleware
+active until both new services are ready and reject requests without the edge
+credential. Remove the old ingress annotation only after those checks pass.
+
+For an initial publishing-only launch, disable member signup using the
+`members_signup_access` setting and remove signup links from secondary navigation.
+Review the starter social account links before publishing the site. Payments,
+newsletters, analytics and federation require separate acceptance before enabling
+their visitor controls.
 
 Ghost's settings cache uses synchronous reads and must retain the process-local
 MemoryCache adapter. Use external Redis for supported asynchronous cache
@@ -79,6 +92,9 @@ image, file, multipart video and byte-range delivery. It removes its own test
 post and upload objects afterward. A failed production check restores the
 previous image; it never automatically reverses a database migration. Review
 schema compatibility and restore procedures before every schema change.
+Failed staging qualification also restores the previous staging image and keeps
+production unchanged. Commissioning with production promotion disabled records a
+qualified staging release separately from a completed production deployment.
 
 Before promotion, the backup lane creates an encrypted PostgreSQL and NAS
 snapshot, verifies the uploaded encrypted bytes, and retains a protected second

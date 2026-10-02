@@ -35,16 +35,16 @@ jobs:
         run: pnpm bootstrap
       - name: Build production dependencies
         run: pnpm --filter-prod 'ghost^...' -r run build
+      - name: Build the production frontend and backend
+        run: pnpm build:production
       - name: Configuration and publishing regression tests
         working-directory: ghost/core
-        run: pnpm exec vitest run test/unit/shared/config/utils.test.js test/unit/server/models/post.test.js --maxWorkers=2
+        run: pnpm exec vitest run test/unit/shared/config/utils.test.js test/unit/server/models/post.test.js test/unit/frontend/web/middleware/serve-public-file.test.js --maxWorkers=2
       - name: Private NAS gateway boundary tests
         working-directory: ghost/core
         run: node --import=tsx --conditions=source --test scripts/gather-assets.test.mjs scripts/gather-origin.test.mjs
       - name: Deployment qualification gate tests
         run: python3 -m unittest discover -s infra/deployer -p test_watch.py
-      - name: Build the production frontend and backend
-        run: pnpm build:production
       - name: Build the bundled public search frontend
         run: pnpm --filter @tryghost/sodo-search run build
       - name: Reject inherited publication workflows

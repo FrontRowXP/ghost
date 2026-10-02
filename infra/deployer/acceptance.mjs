@@ -29,7 +29,9 @@ async function waitForPublicRoutes() {
         try {
             for (const path of ['/ghost/api/admin/site/', '/public/gather-search/sodo-search.min.js',
                 '/public/gather-search/main.css', '/_assets/content/images/.gather-health']) {
-                const response = await fetch(new URL(path, lane.url), {signal: AbortSignal.timeout(10000)});
+                const remaining = deadline - Date.now();
+                if (remaining <= 0) throw new Error('Public route propagation deadline reached');
+                const response = await fetch(new URL(path, lane.url), {signal: AbortSignal.timeout(Math.min(10000, remaining))});
                 await response.body?.cancel();
                 if (response.status !== 200) throw new Error(`${path} status=${response.status}`);
             }
@@ -41,7 +43,7 @@ async function waitForPublicRoutes() {
             stable = 0;
             console.log(`Waiting for public route propagation: ${error.message}`);
         }
-        await pause(3000);
+        if (Date.now() < deadline) await pause(Math.min(3000, deadline - Date.now()));
     }
     throw new Error('Public routes did not converge within 90 seconds; no acceptance data was created');
 }

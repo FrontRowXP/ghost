@@ -45,6 +45,8 @@ jobs:
         run: python3 -m unittest discover -s infra/deployer -p test_watch.py
       - name: Build the production frontend and backend
         run: pnpm build:production
+      - name: Build the bundled public search frontend
+        run: pnpm --filter @tryghost/sodo-search run build
       - name: Reject inherited publication workflows
         run: |
           unexpected=$(find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) ! -name gather.yml)

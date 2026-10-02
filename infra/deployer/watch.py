@@ -86,6 +86,7 @@ def promote(config, root, sha, state):
     run(['pnpm', 'exec', 'vitest', 'run', 'test/unit/shared/config/utils.test.js', 'test/unit/server/models/post.test.js', '--maxWorkers=2'], cwd=core, env=env)
     run(['node', '--import=tsx', '--conditions=source', '--test', 'scripts/gather-assets.test.mjs', 'scripts/gather-origin.test.mjs'], cwd=core, env=env)
     run(['pnpm', 'build:production'], cwd=checkout, env=env)
+    run(['pnpm', '--filter', '@tryghost/sodo-search', 'run', 'build'], cwd=checkout, env=env)
     acceptance_config = json.loads(Path(config['acceptance_config']).read_text())
     pg_env = {**env, 'NODE_ENV': 'production', 'GATHER_REQUIRE_POSTGRES': 'true',
         'database': json.dumps(acceptance_config['postgresCheckDatabase'])}

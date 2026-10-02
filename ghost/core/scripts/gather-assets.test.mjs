@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
 import {createGateway} from './gather-assets.mjs';
 
+const fetchAsset = (url, options = {}) => fetch(url, {
+    ...options, headers: {'x-gather-origin-key': 'a'.repeat(64), ...options.headers}
+});
+
 test('private NAS delivery enforces origin authentication and public prefixes', async () => {
     const calls = [];
     const server = createGateway({
@@ -17,17 +21,18 @@ test('private NAS delivery enforces origin authentication and public prefixes', 
     try {
         assert.equal((await fetch(`${url}/__gather-origin-auth`)).status, 403);
         assert.equal((await fetch(`${url}/__gather-origin-auth`, {headers: {'x-gather-origin-key': 'a'.repeat(64)}})).status, 204);
+        assert.equal((await fetch(`${url}/_assets/content/images/example.png`)).status, 403);
         for (const path of ['content/settings/routes.yaml', 'content/images/%2e%2e/private', 'content/images/x%5cy', 'content/images/%00', '%ZZ']) {
-            assert.ok([400, 404].includes((await fetch(`${url}/_assets/${path}`)).status));
+            assert.ok([400, 404].includes((await fetchAsset(`${url}/_assets/${path}`)).status));
         }
         assert.equal(calls.length, 0);
-        const response = await fetch(`${url}/_assets/content/images/example.png`);
+        const response = await fetchAsset(`${url}/_assets/content/images/example.png`);
         assert.equal(response.status, 200);
         assert.equal(response.headers.get('content-type'), 'image/png');
         assert.equal(await response.text(), 'png');
         assert.deepEqual(calls[0], {Bucket: 'gather-test', Key: 'content/images/example.png'});
-        assert.equal((await fetch(`${url}/_assets/content/images/x`, {method: 'POST'})).status, 405);
-        assert.equal((await fetch(`${url}/_assets/content/images/x`, {headers: {range: 'bytes=1-2,3-4'}})).status, 416);
+        assert.equal((await fetchAsset(`${url}/_assets/content/images/x`, {method: 'POST'})).status, 405);
+        assert.equal((await fetchAsset(`${url}/_assets/content/images/x`, {headers: {range: 'bytes=1-2,3-4'}})).status, 416);
         assert.equal(calls.length, 1);
     } finally {
         server.closeAllConnections();
@@ -48,15 +53,15 @@ test('range and NAS failure responses preserve HTTP semantics', async () => {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const url = `http://127.0.0.1:${server.address().port}/_assets/content/media/`;
     try {
-        const response = await fetch(`${url}clip`, {headers: {range: 'bytes=1-2'}});
+        const response = await fetchAsset(`${url}clip`, {headers: {range: 'bytes=1-2'}});
         assert.equal(response.status, 206);
         assert.equal(response.headers.get('content-range'), 'bytes 1-2/4');
         assert.equal(await response.text(), 'ab');
-        const suffix = await fetch(`${url}clip`, {headers: {range: 'bytes=-2'}});
+        const suffix = await fetchAsset(`${url}clip`, {headers: {range: 'bytes=-2'}});
         assert.equal(suffix.status, 206);
         assert.equal(suffix.headers.get('content-range'), 'bytes 2-3/4');
-        assert.equal((await fetch(`${url}missing`)).status, 404);
-        const offline = await fetch(`${url}offline`);
+        assert.equal((await fetchAsset(`${url}missing`)).status, 404);
+        const offline = await fetchAsset(`${url}offline`);
         assert.equal(offline.status, 503);
         assert.equal(offline.headers.get('cache-control'), 'no-store');
     } finally {

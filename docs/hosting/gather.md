@@ -54,8 +54,10 @@ read-only; install custom themes through reviewed image changes. Admin theme
 uploads cannot persist in this deployment. Route settings and redirects use S3.
 
 The separate asset gateway has only S3 GetObject access to images, media and
-files. It rejects other prefixes and validates an origin credential for the
-ingress ForwardAuth middleware. Keep buckets private, verify the origin TLS
+files. It rejects other prefixes and validates the origin credential on asset
+requests. Core validates the same locally projected credential before routing
+requests. Its authenticated readiness probe reads the credential from the mounted
+configuration; credentials never appear in the rendered resources. Keep buckets private, verify the origin TLS
 certificate at the CDN, and overwrite the origin header at the edge. Start
 with CDN pass-through for the application/API until cache invalidation is
 qualified. Uploaded assets carry a 60-second browser cache lifetime.

@@ -32,6 +32,7 @@
     "bin/",
     "scripts/prune.mts",
     "scripts/gather-assets.mjs",
+    "scripts/gather-ready.mjs",
     "types/",
     "index.js",
     "loggingrc.js",

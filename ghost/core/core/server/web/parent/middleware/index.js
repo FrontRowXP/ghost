@@ -1,4 +1,5 @@
 module.exports = {
+  gatherOrigin: require('./gather-origin').gatherOrigin,
   emitEvents: require('./emit-events'),
   filterQueryParameters: require('./filter-query-parameters').filterQueryParameters,
   ghostLocals: require('./ghost-locals').ghostLocals,

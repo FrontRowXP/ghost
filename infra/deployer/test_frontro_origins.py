@@ -20,5 +20,5 @@ class OriginTests(unittest.TestCase):
         d = self.fixture(); d['spec']['template']['spec']['containers'][0]['command'] = ['other']
         with self.assertRaises(RuntimeError): patch(d, ['https://gather.frontro.com'])
     def test_rejects_paths_fragments_and_shell_like_origins(self):
-        for origin in ['http://gather.frontro.com', 'https://gather.frontro.com/ghost/', 'https://gather.frontro.com/#signin', 'https://gather.frontro.com/$(false)']:
+        for origin in ['http://gather.frontro.com', 'https://gather.frontro.com/ghost/', 'https://gather.frontro.com/#signin', 'https://gather.frontro.com/$(false)', 'https://x";false;"']:
             with self.assertRaises(ValueError): command([origin])

@@ -1,6 +1,7 @@
 """Add reviewed Gather browser origins after the existing OpenBao launcher."""
 import argparse
 import json
+import re
 import shlex
 import subprocess
 from urllib.parse import urlsplit
@@ -11,7 +12,7 @@ EXPECTED = ['/bin/sh', '/openbao/launcher/launch.sh',
 def command(origins):
     for origin in origins:
         u = urlsplit(origin)
-        if u.scheme != 'https' or not u.hostname or u.username or u.password or u.path or u.query or u.fragment:
+        if not re.fullmatch(r'https://[A-Za-z0-9][A-Za-z0-9.-]*(?::[0-9]{1,5})?', origin) or u.scheme != 'https' or not u.hostname or u.username or u.password or u.path or u.query or u.fragment:
             raise ValueError('Expected an exact HTTPS origin')
     lines = ['set -eu']
     for origin in origins:

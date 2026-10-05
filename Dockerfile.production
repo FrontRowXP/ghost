@@ -62,7 +62,8 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store,id=pnpm-store \
 # segfault workaround inside the container.
 RUN pnpm --filter-prod "ghost^..." -r run build && \
     pnpm --filter ghost run build:tsc && \
-    pnpm --filter ghost run build:assets
+    pnpm --filter ghost run build:assets && \
+    node ghost/core/scripts/frontro-theme-branding.mjs ghost/core/content/themes
 
 # Produce a self-contained deploy dir: ghost/core's `files` set + a fully resolved,
 # production-only node_modules (--prod drops devDeps, keeps optional better-sqlite3).
@@ -119,7 +120,6 @@ COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX --from=deploy /home/ghost ./
 # cp -a preserves the nobody:nogroup ownership set at COPY time, so base_content
 # and default need no re-chown; only the writable content/log dirs flip to ghost.
 RUN mkdir -p default log && \
-    node scripts/frontro-theme-branding.mjs content/themes && \
     cp -a content base_content && \
     cp -a content/themes/casper default/casper && \
     ([ -d content/themes/source ] && cp -a content/themes/source default/source || true) && \

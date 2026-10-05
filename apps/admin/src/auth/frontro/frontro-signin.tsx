@@ -29,10 +29,12 @@ export default function FrontroSignin({ apiOrigin }: { apiOrigin: string }) {
       if (!result.authenticated) throw new AuthError('frontro_auth_unavailable', 503);
       if (active.current) reloadAdmin(takeSigninRedirect());
     } catch (cause) {
-      const details = cause && typeof cause === 'object' && 'data' in cause
-        ? (cause as { data?: { errors?: Array<{ message?: string }> } }).data : null;
-      const code = details?.errors?.[0]?.message;
-      throw code ? new AuthError(code, 403) : cause;
+      const details = cause && typeof cause === 'object'
+        ? cause as { response?: Response; data?: { errors?: Array<{ message?: string }> } } : null;
+      const code = details?.data?.errors?.[0]?.message;
+      const status = details?.response?.status || 503;
+      throw code ? new AuthError(status === 429 ? 'rate_limited' : code, status,
+        Number(details?.response?.headers.get('Retry-After')) || 0) : cause;
     } finally {
       connecting.current = false;
     }

@@ -27,6 +27,7 @@ import { UserMenuAvatar } from './user-menu-avatar';
 import { UserMenuHeader } from './user-menu-header';
 import { Link } from '@tryghost/admin-x-framework';
 import { getAdminToolbarUrl } from '@/utils/admin-toolbar-url';
+import { reloadAdmin } from '@/auth/reload';
 
 function UserMenuProfile() {
   const currentUser = useCurrentUser();
@@ -89,8 +90,13 @@ function UserMenuAppearance() {
 
 function UserMenuSignOut() {
   const { mutateAsync: deleteSession } = useDeleteSession();
+  const { data: siteData } = useBrowseSite();
 
   const handleSignOut = async () => {
+    if (siteData?.site.frontroAuth?.apiOrigin) {
+      reloadAdmin('/signout');
+      return;
+    }
     try {
       await deleteSession(null);
       // Full page load, not a router navigation: the session is gone, so

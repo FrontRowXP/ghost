@@ -48,7 +48,7 @@ jobs:
       - name: Install the isolated acceptance browser
         run: pnpm --filter @tryghost/admin exec playwright install --with-deps chromium
       - name: Frontro authentication and older-backend browser acceptance
-        run: pnpm --filter @tryghost/admin test:acceptance src/auth/frontro/frontro-signin.acceptance.test.tsx src/auth/signin.acceptance.test.tsx
+        run: pnpm --filter @tryghost/admin test:acceptance src/auth/frontro/frontro-signin.acceptance.test.tsx src/auth/signin.acceptance.test.tsx src/layout/frontro-signout.acceptance.test.tsx
       - name: Deployment qualification gate tests
         run: python3 -m unittest discover -s infra/deployer -p 'test_*.py'
       - name: Build the bundled public search frontend

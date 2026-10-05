@@ -58,6 +58,10 @@ Ghost sign-out revokes its delegated API session. The React sign-out screen also
 signs out the browser's Moments API session and prevents immediate SSO
 reconnection after an explicit sign-out. Other independently issued device
 sessions retain the Moments API's existing logout behavior.
+The sidebar uses this shared screen when the Frontro capability is present.
+After an email code is accepted, a failed staff-session handoff can be retried
+without submitting that consumed code again. HTTP throttling remains a retry
+delay rather than a generic connection failure.
 
 The legacy Ghost password endpoint remains available for operator recovery;
 changing that policy is separate from selecting the new public login screen.

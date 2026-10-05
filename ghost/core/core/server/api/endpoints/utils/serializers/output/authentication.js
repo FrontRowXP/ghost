@@ -9,6 +9,15 @@ const messages = {
 };
 
 module.exports = {
+  // The HTTP adapter executes these session handlers after the API pipeline.
+  frontroStart(handler, apiConfig, frame) {
+    frame.response = handler;
+  },
+
+  frontroComplete(handler, apiConfig, frame) {
+    frame.response = handler;
+  },
+
   setup(user, apiConfig, frame) {
     frame.response = {
       users: [mappers.users(user, { options: { context: { internal: true } } })],

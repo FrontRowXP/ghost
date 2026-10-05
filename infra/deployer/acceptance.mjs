@@ -99,7 +99,16 @@ async function upload(kind, bytes, extension, mime) {
 }
 try {
     await waitForPublicRoutes();
-    await request('/ghost/api/admin/site/', {authenticated: false});
+    const site = await (await request('/ghost/api/admin/site/', {authenticated: false})).json();
+    if (lane.frontroAuthRequired) {
+        if (site.site?.frontroAuth?.apiOrigin !== 'https://moments.frontro.com' || site.site.authReact !== true) {
+            throw new Error('Moments staff authentication capability is missing or misconfigured');
+        }
+        await request('/ghost/api/admin/authentication/frontro/complete/', {
+            method: 'POST', body: '{}', expected: 401, authenticated: false
+        });
+        console.log('Moments capability published and anonymous session completion denied.');
+    }
     for (const [file, mime] of [['sodo-search.min.js', 'application/javascript'], ['main.css', 'text/css']]) {
         const asset = await request(`/public/gather-search/${file}`, {authenticated: false});
         if (!asset.headers.get('content-type')?.startsWith(mime) || (await asset.arrayBuffer()).byteLength < 100) {

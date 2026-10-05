@@ -18,7 +18,11 @@ session service. It never grants a role or creates staff from an email address.
 Core advertises `site.frontroAuth` only when configured. That is the capability
 check; older backends keep their existing password screen. The current Moments
 API must explicitly allow the Gather HTTPS origin in `MOMENTS_ALLOWED_ORIGINS`
-for credentialed requests, OAuth returns, and handoff operations.
+for credentialed requests, OAuth returns, and handoff operations. Use the
+canonical API origin matching Moments `MOMENTS_PUBLIC_URL` (currently
+`https://moments.frontro.com`). Its `__Host-` cookies belong to that exact
+host; using the `api.moments.frontro.com` alias would lose the browser flow
+cookie on the Google callback and would not reuse the existing Moments session.
 
 Example private Ghost configuration (IDs are placeholders):
 
@@ -27,7 +31,7 @@ Example private Ghost configuration (IDs are placeholders):
   "security": {
     "frontroAuth": {
       "enabled": true,
-      "apiOrigin": "https://api.moments.frontro.com",
+      "apiOrigin": "https://moments.frontro.com",
       "staff": {
         "<verified-Moments-user-UUID>": "<existing-active-Ghost-staff-ID>"
       }

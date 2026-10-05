@@ -166,25 +166,38 @@ certify real NAS or TLS.
 Real staging acceptance must also prove independent owner login/revocation,
 public HTTPS rendering, NAS multipart uploads/range reads/deletion, encrypted
 asset/database recovery and provisioning failure/retry. Keep production disabled
-on any failed boundary. The current NAS multipart UploadPart times out even for a 16-KiB part with both
-SDK and legacy AWS CLI clients, while an ordinary five-MiB PutObject succeeds.
-This isolates the failing multipart service path. Diagnostic objects/uploads were
-removed. Inspect and repair the NAS service before qualification; successful
-health reads or ordinary writes are insufficient.
+on any failed boundary. Successful health reads or ordinary writes are
+insufficient: qualify multipart completion, full byte verification, range reads,
+deletion, and encrypted recovery using the deployment's restricted credentials.
 
-The NAS runs RustFS 1.0.0. The failure also reproduces with NAS administrator
-credentials, so Gather's restricted storage policy is not the cause. Read-only
-container diagnostics found RustFS threads waiting on ext4 journal commits and
-roughly 76% full host I/O pressure over five minutes, despite all three drives
-being reported online. Do not infer storage readiness from that drive inventory.
+RustFS multipart timeouts can result from competing migration and metadata work.
+The failed 16-KiB UploadPart reproduced with administrator credentials and passed
+when competing migrations were paused. Throttle aggregate migration concurrency,
+bandwidth, and metadata requests before increasing service timeouts. Retain
+checksum checks and non-deleting copy semantics when changing migration limits.
+Scanner throttling alone did not resolve the failure.
 
-The native signed admin API accepted a live scanner change to `speed=slow`,
-`max_concurrent_disk_scans=1`, `max_concurrent_set_scans=1`, and `cycle=600`;
-effective runtime settings report `source=config`. The previous scanner settings
-were retained privately for rollback. A subsequent 16-KiB multipart part still
-timed out after 30 seconds. This is pressure mitigation, not passing acceptance.
-Existing scans may remain active until they finish. Check scanner activity, host
-I/O pressure and journal waits before further changes; retain bitrot/heal
-protection and inspect NAS storage diagnostics before attempting a restart or
-filesystem repair. Repeat real multipart completion, range reads, deletion and
-encrypted recovery only after the underlying I/O boundary passes.
+For HDD deployments, RustFS 1.0.0 supports
+`RUSTFS_DRIVE_TIMEOUT_PROFILE=high_latency`, applied on process restart. Supported
+scanner controls allow `speed=slowest`, one concurrent disk/set scan, and
+`cycle=1800`; keep bitrot and healing protection enabled. A startup scanner delay
+can provide a quiet recovery window, but acceptance during that window does not
+prove performance with background maintenance active. See the upstream
+[drive timeout guidance](https://github.com/rustfs/rustfs/blob/1.0.0/docs/operations/drive-timeout-tuning.md)
+and [scanner controls](https://github.com/rustfs/rustfs/blob/1.0.0/docs/operations/scanner-runtime-controls.md).
+
+Avoid recursively changing ownership of an existing object tree during every
+deployment. Prepare the volume root directories for the service user; handle
+any actual ownership migration separately. Recursive startup preparation can
+hold the storage process in its created state indefinitely. Observe asynchronous
+deployment completion and verify the new container's settings and readiness
+before submitting another deployment.
+
+After these storage changes, live acceptance passed a 32-MiB multipart upload,
+matching full download, range read, and deletion. Gather's restricted credentials
+also passed a 10-MiB multipart round trip. A separate encrypted 10-MiB object
+round trip passed authenticated decryption and byte verification. These checks
+do not qualify database backup/restore or sustained performance with scanners
+active. Keep production tenancy disabled until those remaining commissioning
+checks and public TLS pass. Drive inventory or a healthy SMART summary alone
+does not qualify storage latency or rule out intermittent hardware faults.

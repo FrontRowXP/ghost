@@ -1,31 +1,21 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {useBrowseSite} from '@tryghost/admin-x-framework/api/site';
-import {apiUrl} from '@tryghost/admin-x-framework/helpers';
+import {gatherSitesRequest as request, SiteManagementError} from '@tryghost/admin-x-framework/api/gather-sites';
 import {Button, Input, Label} from '@tryghost/shade/components';
 import {PageHeader} from '@tryghost/shade/patterns';
-import {AuthModal} from '../auth/frontro/moments/AuthModal';
-import {AuthError, authMessage, authRequest, type Session} from '../auth/frontro/moments/client';
-import logo from '../auth/frontro/moments/nugs/frontro-logo.svg';
-import '../auth/frontro/moments/auth.css';
+import {AuthModal} from '@/auth/frontro/moments/AuthModal';
+import {AuthError, authMessage, authRequest, type Session} from '@/auth/frontro/moments/client';
+import logo from '@/auth/frontro/moments/nugs/frontro-logo.svg';
+import '@/auth/frontro/moments/auth.css';
 import './site-hub.css';
 
 type Workspace = {id: string; name: string; role: string};
 type HubSession = {user: {id: string; name: string}; workspaces: Workspace[]; csrfToken: string; creationEnabled: boolean};
 type Site = {id: string; name: string; status: string; hostname?: string; verified_at?: string};
-async function request<T>(path: string, body?: unknown, csrf?: string, method?: string): Promise<T> {
-    const response = await fetch(apiUrl('/gather/' + path), {method: method || (body === undefined ? 'GET' : 'POST'),
-        credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(20000),
-        headers: {...(body === undefined ? {} : {'Content-Type': 'application/json'}), ...(csrf ? {'X-CSRF-Token': csrf} : {})},
-        body: body === undefined ? undefined : JSON.stringify(body)});
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new AuthError(data.code || 'site_management_unavailable', response.status);
-    }
-    return response.status === 204 ? undefined as T : response.json();
-}
 function message(cause: unknown) {
-    if (cause instanceof AuthError && cause.code === 'site_creation_unavailable') return 'New sites are not available yet. You can continue editing your existing sites.';
-    if (cause instanceof AuthError && cause.code === 'workspace_owner_required') return 'Only a workspace owner can create a site.';
+    if (cause instanceof SiteManagementError && cause.code === 'site_creation_unavailable') return 'New sites are not available yet. You can continue editing your existing sites.';
+    if (cause instanceof SiteManagementError && cause.code === 'workspace_owner_required') return 'Only a workspace owner can create a site.';
+    if (cause instanceof SiteManagementError) return authMessage(new AuthError(cause.code, cause.status));
     return authMessage(cause);
 }
 
@@ -77,7 +67,7 @@ function SitesWorkspace({apiOrigin}: {apiOrigin: string}) {
         mounted.current = true;
         let active = true;
         void load().catch(async (cause) => {
-            if (cause instanceof AuthError && cause.status === 401) {
+            if ((cause instanceof AuthError || cause instanceof SiteManagementError) && cause.status === 401) {
                 if (!sessionStorage.getItem('frontro-explicit-signout')) {
                     try { await connect(); }
                     catch (error) {

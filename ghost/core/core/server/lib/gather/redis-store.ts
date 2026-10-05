@@ -1,3 +1,4 @@
+import errors from '@tryghost/errors';
 import {createCipheriv, createDecipheriv, randomBytes} from 'node:crypto';
 
 export interface RedisClient {
@@ -18,7 +19,7 @@ export class SealedRedisStore {
     private readonly now: () => number;
     constructor(redis: RedisClient, prefix: string, secret: string, maxRecords = 1000, now = Date.now) {
         if (!/^[a-f0-9]{64}$/.test(secret) || !/^[a-z0-9:{}_.-]{1,200}$/.test(prefix)) {
-            throw new Error('Invalid site session configuration');
+            throw new errors.IncorrectUsageError({message: 'Invalid site session configuration'});
         }
         this.key = Buffer.from(secret, 'hex');
         this.redis = redis;
@@ -27,7 +28,7 @@ export class SealedRedisStore {
         this.now = now;
     }
     private recordKey(token: string) {
-        if (!TOKEN.test(token)) throw new Error('Invalid session token');
+        if (!TOKEN.test(token)) throw new errors.IncorrectUsageError({message: 'Invalid session token'});
         return `${this.prefix}:record:${token}`;
     }
     private seal(token: string, value: unknown): string {
@@ -60,9 +61,9 @@ export class SealedRedisStore {
     }
     async put(token: string, value: {expiresAt: number} & Record<string, unknown>) {
         const ttl = value.expiresAt - this.now();
-        if (ttl <= 0) throw new Error('Expired session');
+        if (ttl <= 0) throw new errors.IncorrectUsageError({message: 'Expired session'});
         const updated = await this.redis.set(this.recordKey(token), this.seal(token, value), 'PX', ttl, 'XX');
-        if (!updated) throw new Error('Session reservation expired');
+        if (!updated) throw new errors.IncorrectUsageError({message: 'Session reservation expired'});
     }
     async get(token: string) {
         const record = await this.redis.get(this.recordKey(token));

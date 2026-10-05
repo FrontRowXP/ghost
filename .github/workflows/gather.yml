@@ -106,3 +106,19 @@ jobs:
         run: |
           unexpected=$(find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) ! -name gather.yml)
           test -z "$unexpected"
+      - name: Prepare focused Gather formatting review
+        run: |
+          node scripts/format.js apps/admin/src/sites apps/admin-x-framework/src/api/gather-sites.ts ghost/core/core/server/lib/gather ghost/core/core/server/services/gather-sites ghost/core/core/server/api/endpoints/gather-sites.js ghost/core/core/server/data/schema/gather-registry.js ghost/core/core/server/data/migrations/versions/6.68/2026-10-05-18-46-25-add-gather-site-registry.js ghost/core/scripts/gather-tenancy.test.mjs ghost/core/scripts/gather-registry.integration.mjs ghost/core/test/e2e-api/admin/gather-sites.test.js docs/hosting/gather-tenancy.md
+          git diff --binary > "$RUNNER_TEMP/gather-format.patch"
+      - name: Preserve formatting corrections
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gather-format-corrections
+          path: ${{ runner.temp }}/gather-format.patch
+          retention-days: 3
+      - name: Focused Gather source lint
+        run: |
+          pnpm --filter @tryghost/admin-x-framework exec eslint src/api/gather-sites.ts
+          pnpm --filter @tryghost/admin exec eslint src/sites/site-hub.tsx src/sites/site-hub.acceptance.test.tsx
+          pnpm --filter ghost exec eslint core/server/lib/gather/*.ts core/server/services/gather-sites/*.ts core/server/api/endpoints/gather-sites.js core/server/data/schema/gather-registry.js core/server/data/migrations/versions/6.68/2026-10-05-18-46-25-add-gather-site-registry.js test/e2e-api/admin/gather-sites.test.js
+          git diff --exit-code

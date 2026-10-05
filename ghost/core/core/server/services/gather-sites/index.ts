@@ -1,3 +1,4 @@
+import errors from '@tryghost/errors';
 import config from '../../../shared/config';
 import {SiteRegistry} from '../../lib/gather/registry';
 import {SealedRedisStore} from '../../lib/gather/redis-store';
@@ -9,18 +10,18 @@ export async function init() {
     if (hub) return;
     if (config.get('gather:sites:enabled') !== true) return;
     if (config.get('database:client') !== 'pg' || !config.get('security:frontroAuth:enabled')) {
-        throw new Error('Gather site management requires PostgreSQL and Moments authentication');
+        throw new errors.IncorrectUsageError({message: 'Gather site management requires PostgreSQL and Moments authentication'});
     }
     const urlUtils = require('../../../shared/url-utils').default;
     const origin = new URL(urlUtils.getAdminUrl() || urlUtils.getSiteUrl()).origin;
-    if (!origin.startsWith('https://')) throw new Error('Gather site management requires HTTPS');
+    if (!origin.startsWith('https://')) throw new errors.IncorrectUsageError({message: 'Gather site management requires HTTPS'});
     const settings = config.get('gather:sites');
     if (!['staging', 'production'].includes(settings.environment) || !settings.redis?.host) {
-        throw new Error('Gather site management requires environment and shared Redis');
+        throw new errors.IncorrectUsageError({message: 'Gather site management requires environment and shared Redis'});
     }
     const database = require('../../data/db').knex;
     for (const name of ['gather_sites', 'gather_site_domains', 'gather_site_staff']) {
-        if (!(await database.schema.hasTable(name))) throw new Error('Gather site registry migration is missing');
+        if (!(await database.schema.hasTable(name))) throw new errors.IncorrectUsageError({message: 'Gather site registry migration is missing'});
     }
     // Own this connection rather than reusing the global cache adapter's client.
     const redisStore = require('cache-manager-ioredis').create({...settings.redis, connectTimeout: 5000, maxRetriesPerRequest: 1});

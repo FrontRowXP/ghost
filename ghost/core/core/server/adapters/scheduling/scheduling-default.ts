@@ -8,7 +8,7 @@ import {
   SchedulingBase,
   type SchedulerJob as BaseSchedulerJob,
 } from '@tryghost/adapter-base-scheduling';
-const {tenantCallback} = require('../../lib/gather/scheduler-callback');
+const { tenantCallback } = require('../../lib/gather/scheduler-callback');
 
 type SchedulerJob = BaseSchedulerJob & {
   tries?: number;
@@ -178,7 +178,9 @@ export default class SchedulingDefault extends SchedulingBase {
     }
 
     const callback = tenantCallback(url, config);
-    if (callback.headers) options.headers = callback.headers;
+    if (callback.headers) {
+      options.headers = callback.headers;
+    }
     return this.request(callback.url, options).catch((err: GhostError) => {
       const { statusCode } = err;
 

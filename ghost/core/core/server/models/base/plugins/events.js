@@ -149,7 +149,9 @@ module.exports = function (Bookshelf) {
         const siteId = config.get('gather:tenant:siteId');
         if (siteId && Object.hasOwn(schema.tables[this.tableName], 'site_id')) {
           const supplied = model.get('site_id');
-          if (supplied && supplied !== siteId) throw new Error('A publication model cannot change its fixed site identity');
+          if (supplied && supplied !== siteId) {
+            throw new Error('A publication model cannot change its fixed site identity');
+          }
           // Bookshelf explicitly fills missing schema fields with null below,
           // so the database default alone cannot handle model-created rows.
           model.set('site_id', siteId);

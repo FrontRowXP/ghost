@@ -2646,5 +2646,5 @@ module.exports = {
 Object.assign(module.exports, require('./gather-registry'));
 
 for (const table of require('../../lib/gather/tenant-tables.json')) {
-  module.exports[table].site_id = {type: 'string', maxlength: 36, nullable: true, index: true};
+  module.exports[table].site_id = { type: 'string', maxlength: 36, nullable: true, index: true };
 }

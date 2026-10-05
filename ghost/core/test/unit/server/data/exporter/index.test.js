@@ -131,19 +131,24 @@ describe('Exporter', function () {
     });
 
     it('never exports platform identity or domain bindings, including explicit includes', async function () {
-      const {PLATFORM_TABLES} = require('../../../../../core/server/data/exporter/table-lists.js');
-      const result = await exporter.doExport({include: PLATFORM_TABLES});
+      const {
+        PLATFORM_TABLES,
+      } = require('../../../../../core/server/data/exporter/table-lists.js');
+      const result = await exporter.doExport({ include: PLATFORM_TABLES });
       for (const table of PLATFORM_TABLES) {
-        assert.equal(knexMock.getCalls().some(call => call.args[0] === table), false);
+        assert.equal(
+          knexMock.getCalls().some((call) => call.args[0] === table),
+          false,
+        );
         assert.equal(result.data[table], undefined);
       }
     });
 
     it('strips server-assigned site authority from publication rows without mutating them', async function () {
-      const record = {id: 'fixture', site_id: 'private-site', title: 'Exported title'};
+      const record = { id: 'fixture', site_id: 'private-site', title: 'Exported title' };
       queryMock.select.resolves([record]);
       const result = await exporter.doExport();
-      assert.deepEqual(result.data.posts, [{id: 'fixture', title: 'Exported title'}]);
+      assert.deepEqual(result.data.posts, [{ id: 'fixture', title: 'Exported title' }]);
       assert.equal(record.site_id, 'private-site');
     });
   });
@@ -211,7 +216,9 @@ describe('Exporter', function () {
         .filter((table) => !ignoredTables.includes(table))
         .sort();
       const actualTables = BACKUP_TABLES.concat(TABLES_ALLOWLIST).sort();
-      actualTables.push(...require('../../../../../core/server/data/exporter/table-lists.js').PLATFORM_TABLES);
+      actualTables.push(
+        ...require('../../../../../core/server/data/exporter/table-lists.js').PLATFORM_TABLES,
+      );
       actualTables.sort();
 
       // NOTE: this test is serving a role of a reminder to have a look into exported tables allowlists

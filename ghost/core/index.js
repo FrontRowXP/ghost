@@ -14,7 +14,11 @@ const mode = argv[2];
 
 if (mode === 'site-worker') {
   // A supervisor crash must not leave orphan publishing/scheduler processes.
-  process.on('disconnect', () => process.kill(process.pid, 'SIGTERM'));
+  process.once('disconnect', () => {
+    // A blocked upload/drain must not outlive the supervisor lease.
+    setTimeout(() => process.exit(1), 5000).unref();
+    process.kill(process.pid, 'SIGTERM');
+  });
 }
 
 // Switch between boot modes

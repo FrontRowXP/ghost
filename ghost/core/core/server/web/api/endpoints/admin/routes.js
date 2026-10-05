@@ -17,7 +17,7 @@ module.exports = function apiRoutes() {
 
   router.use(apiMw.cors);
   if (require('../../../../../shared/config').get('gather:tenant:siteId')) {
-    const {nativeAuthUnavailable} = require('../../../../../server/lib/gather/native-auth');
+    const { nativeAuthUnavailable } = require('../../../../../server/lib/gather/native-auth');
     router.use((req, res, next) => {
       if (nativeAuthUnavailable(req.method, req.path)) return res.sendStatus(404);
       next();
@@ -33,7 +33,11 @@ module.exports = function apiRoutes() {
   router.get('/gather/sites', api.gatherSites.browse);
   router.post('/gather/sites', shared.middleware.brute.globalBlock, api.gatherSites.add);
   router.post('/gather/auth/start', shared.middleware.brute.globalBlock, api.gatherSites.start);
-  router.post('/gather/auth/complete', shared.middleware.brute.globalBlock, api.gatherSites.complete);
+  router.post(
+    '/gather/auth/complete',
+    shared.middleware.brute.globalBlock,
+    api.gatherSites.complete,
+  );
   router.delete('/gather/session', api.gatherSites.logout);
 
   // ## Configuration
@@ -440,14 +444,18 @@ module.exports = function apiRoutes() {
   router.post('/authentication/gather/delegation', async (req, res, next) => {
     const config = require('../../../../../shared/config');
     const secret = config.get('gather:tenant:bridgeSecret');
-    const {timingSafeEqual} = require('node:crypto');
+    const { timingSafeEqual } = require('node:crypto');
     const supplied = Buffer.from(req.get('x-gather-worker-key') || '');
-    if (!secret || !['127.0.0.1', '::ffff:127.0.0.1', '::1'].includes(req.socket.remoteAddress) ||
-      supplied.length !== Buffer.byteLength(secret) || !timingSafeEqual(supplied, Buffer.from(secret))) {
+    if (
+      !secret ||
+      !['127.0.0.1', '::ffff:127.0.0.1', '::1'].includes(req.socket.remoteAddress) ||
+      supplied.length !== Buffer.byteLength(secret) ||
+      !timingSafeEqual(supplied, Buffer.from(secret))
+    ) {
       return res.sendStatus(404);
     }
     try {
-      await auth.session.initSession(req, res, error => {
+      await auth.session.initSession(req, res, (error) => {
         if (error) return next(error);
         Promise.resolve(auth.session.frontroAuth.acceptDelegation(req, res, req.body)).catch(next);
       });
@@ -474,10 +482,18 @@ module.exports = function apiRoutes() {
   router.get('/identities', mw.authAdminApi, http(api.identities.read));
 
   // ## Authentication
-  router.post('/authentication/frontro/start', shared.middleware.brute.globalBlock,
-    auth.session.initSession, http(api.authentication.frontroStart));
-  router.post('/authentication/frontro/complete', shared.middleware.brute.globalBlock,
-    auth.session.initSession, http(api.authentication.frontroComplete));
+  router.post(
+    '/authentication/frontro/start',
+    shared.middleware.brute.globalBlock,
+    auth.session.initSession,
+    http(api.authentication.frontroStart),
+  );
+  router.post(
+    '/authentication/frontro/complete',
+    shared.middleware.brute.globalBlock,
+    auth.session.initSession,
+    http(api.authentication.frontroComplete),
+  );
   router.post(
     '/authentication/password_reset',
     shared.middleware.brute.globalReset,

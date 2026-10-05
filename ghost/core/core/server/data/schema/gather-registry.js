@@ -107,26 +107,26 @@ module.exports = {
 };
 
 Object.assign(module.exports, {
-  "gather_tenancy_state": {
-    "key": {
-      "type": "string",
-      "maxlength": 50,
-      "nullable": false,
-      "primary": true
+  gather_tenancy_state: {
+    key: {
+      type: 'string',
+      maxlength: 50,
+      nullable: false,
+      primary: true,
     },
-    "manifest_hash": {
-      "type": "string",
-      "maxlength": 64,
-      "nullable": false
+    manifest_hash: {
+      type: 'string',
+      maxlength: 64,
+      nullable: false,
     },
-    "legacy_site_id": {
-      "type": "string",
-      "maxlength": 36,
-      "nullable": false
+    legacy_site_id: {
+      type: 'string',
+      maxlength: 36,
+      nullable: false,
     },
-    "installed_at": {
-      "type": "dateTime",
-      "nullable": false
-    }
-  }
+    installed_at: {
+      type: 'dateTime',
+      nullable: false,
+    },
+  },
 });

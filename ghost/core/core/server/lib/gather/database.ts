@@ -5,10 +5,17 @@ import tables from './tenant-tables.json';
 const canonicalSchema = require('../../data/schema/schema');
 
 export const TENANT_TABLES: readonly string[] = Object.freeze(tables);
-export const TENANT_MANIFEST_HASH = createHash('sha256').update(JSON.stringify({tables, schema: canonicalSchema})).digest('hex');
+export const TENANT_MANIFEST_HASH = createHash('sha256')
+  .update(JSON.stringify({ tables, schema: canonicalSchema }))
+  .digest('hex');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ROLE = /^[a-z_][a-z0-9_]{0,62}$/;
-const PLATFORM = ['gather_sites', 'gather_site_domains', 'gather_site_staff', 'gather_tenancy_state'];
+const PLATFORM = [
+  'gather_sites',
+  'gather_site_domains',
+  'gather_site_staff',
+  'gather_tenancy_state',
+];
 
 export function tenantRole(siteId: string): string {
   if (!UUID.test(siteId)) {
@@ -18,68 +25,118 @@ export function tenantRole(siteId: string): string {
 }
 
 function constraintName(kind: string, table: string, columns: string[]): string {
-  return `gather_${kind}_${createHash('sha256').update(table + ':' + columns.join(',')).digest('hex').slice(0, 24)}`;
+  return `gather_${kind}_${createHash('sha256')
+    .update(table + ':' + columns.join(','))
+    .digest('hex')
+    .slice(0, 24)}`;
 }
 
 // This is an explicit, transactional operator rollout after an encrypted backup,
 // not an HTTP operation and not a migration performed by a tenant runtime.
-export async function installTenantIsolation(database: Knex, legacySiteId: string, controlRole: string) {
+export async function installTenantIsolation(
+  database: Knex,
+  legacySiteId: string,
+  controlRole: string,
+) {
   tenantRole(legacySiteId);
-  if (database.client.config.client !== 'pg' || !ROLE.test(controlRole) || controlRole.startsWith('gather_site_')) {
+  if (
+    database.client.config.client !== 'pg' ||
+    !ROLE.test(controlRole) ||
+    controlRole.startsWith('gather_site_')
+  ) {
     throw new errors.IncorrectUsageError({ message: 'Invalid tenancy operator configuration' });
   }
   return database.transaction(async (tx) => {
     await tx.raw("SET LOCAL lock_timeout = '5s'");
     await tx.raw("SET LOCAL statement_timeout = '5min'");
     await tx.raw("SELECT pg_advisory_xact_lock(hashtextextended('gather-tenant-isolation', 0))");
-    const { rows: [{ schema, owner, version }] } = await tx.raw(
+    const {
+      rows: [{ schema, owner, version }],
+    } = await tx.raw(
       "SELECT current_schema() AS schema, current_user AS owner, current_setting('server_version_num')::integer AS version",
     );
     if (version < 160000 || owner === controlRole) {
-      throw new errors.IncorrectUsageError({ message: 'Tenancy requires PostgreSQL 16 and a separate migration owner' });
+      throw new errors.IncorrectUsageError({
+        message: 'Tenancy requires PostgreSQL 16 and a separate migration owner',
+      });
     }
-    const operator = await tx.raw('SELECT rolsuper, rolcreaterole FROM pg_roles WHERE rolname=current_user');
-    if (!operator.rows[0]?.rolsuper && !operator.rows[0]?.rolcreaterole) throw new errors.IncorrectUsageError({message: 'The migration owner must be able to issue constrained runtime roles'});
-    const control = await tx.raw('SELECT rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolinherit, rolreplication FROM pg_roles WHERE rolname = ?', [controlRole]);
+    const operator = await tx.raw(
+      'SELECT rolsuper, rolcreaterole FROM pg_roles WHERE rolname=current_user',
+    );
+    if (!operator.rows[0]?.rolsuper && !operator.rows[0]?.rolcreaterole) {
+      throw new errors.IncorrectUsageError({
+        message: 'The migration owner must be able to issue constrained runtime roles',
+      });
+    }
+    const control = await tx.raw(
+      'SELECT rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolinherit, rolreplication FROM pg_roles WHERE rolname = ?',
+      [controlRole],
+    );
     if (!control.rows.length || Object.values(control.rows[0]).some(Boolean)) {
-      throw new errors.IncorrectUsageError({ message: 'The control role must not have administrative database privileges' });
+      throw new errors.IncorrectUsageError({
+        message: 'The control role must not have administrative database privileges',
+      });
     }
-    const controlMembership = await tx.raw('SELECT 1 FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname=?)', [controlRole]);
+    const controlMembership = await tx.raw(
+      'SELECT 1 FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname=?)',
+      [controlRole],
+    );
     if (controlMembership.rows.length) {
-      throw new errors.IncorrectUsageError({ message: 'The control role must not inherit or assume database roles' });
+      throw new errors.IncorrectUsageError({
+        message: 'The control role must not inherit or assume database roles',
+      });
     }
     const state = await tx('gather_tenancy_state').where({ key: 'isolation' }).first();
     if (state) {
       if (state.manifest_hash !== TENANT_MANIFEST_HASH || state.legacy_site_id !== legacySiteId) {
-        throw new errors.IncorrectUsageError({ message: 'Tenancy inventory or legacy site changed; an explicit upgrade is required' });
+        throw new errors.IncorrectUsageError({
+          message: 'Tenancy inventory or legacy site changed; an explicit upgrade is required',
+        });
       }
       return;
     }
     if (!(await tx('gather_sites').where({ id: legacySiteId, status: 'active' }).first())) {
-      throw new errors.IncorrectUsageError({ message: 'Register the verified existing publication before isolation rollout' });
+      throw new errors.IncorrectUsageError({
+        message: 'Register the verified existing publication before isolation rollout',
+      });
     }
-    const inventory = await tx.raw("SELECT tablename FROM pg_tables WHERE schemaname = ?", [schema]);
+    const inventory = await tx.raw('SELECT tablename FROM pg_tables WHERE schemaname = ?', [
+      schema,
+    ]);
     const allowed = new Set([...tables, ...PLATFORM, 'migrations', 'migrations_lock']);
-    if (inventory.rows.some((row: any) => !allowed.has(row.tablename)) || tables.some(name => !inventory.rows.some((row: any) => row.tablename === name))) {
-      throw new errors.IncorrectUsageError({ message: 'Publishing table inventory differs from the audited manifest' });
+    if (
+      inventory.rows.some((row: any) => !allowed.has(row.tablename)) ||
+      tables.some((name) => !inventory.rows.some((row: any) => row.tablename === name))
+    ) {
+      throw new errors.IncorrectUsageError({
+        message: 'Publishing table inventory differs from the audited manifest',
+      });
     }
     for (const table of tables) {
       if (!(await tx.schema.hasColumn(table, 'site_id'))) {
-        throw new errors.IncorrectUsageError({ message: 'Publishing tenancy column migration is missing' });
+        throw new errors.IncorrectUsageError({
+          message: 'Publishing tenancy column migration is missing',
+        });
       }
       if (await tx(table).whereNotNull('site_id').whereNot('site_id', legacySiteId).first()) {
-        throw new errors.IncorrectUsageError({ message: 'Existing rows belong to another site; refusing to reassign them' });
+        throw new errors.IncorrectUsageError({
+          message: 'Existing rows belong to another site; refusing to reassign them',
+        });
       }
       await tx(table).whereNull('site_id').update({ site_id: legacySiteId });
     }
-    await tx.raw(`CREATE FUNCTION ??.gather_current_site() RETURNS text LANGUAGE sql STABLE
+    await tx.raw(
+      `CREATE FUNCTION ??.gather_current_site() RETURNS text LANGUAGE sql STABLE
       SET search_path = pg_catalog AS $body$
       SELECT CASE WHEN session_user::text ~ '^gather_site_[0-9a-f]{32}$' THEN
         regexp_replace(substring(session_user::text FROM 13),
           '^(.{8})(.{4})(.{4})(.{4})(.{12})$', '\\1-\\2-\\3-\\4-\\5') ELSE NULL END
-      $body$`, [schema]);
+      $body$`,
+      [schema],
+    );
     // Capture real foreign keys before dropping global semantic uniqueness.
-    const foreign = await tx.raw(`SELECT c.conname, source.relname AS source, target.relname AS target,
+    const foreign = await tx.raw(
+      `SELECT c.conname, source.relname AS source, target.relname AS target,
       c.confdeltype AS deletion, c.condeferrable AS deferred, c.condeferred AS initially_deferred,
       ARRAY(SELECT a.attname::text FROM unnest(c.conkey) WITH ORDINALITY k(num,ord)
         JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.num ORDER BY k.ord) AS columns,
@@ -87,23 +144,41 @@ export async function installTenantIsolation(database: Knex, legacySiteId: strin
         JOIN pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=k.num ORDER BY k.ord) AS target_columns
       FROM pg_constraint c JOIN pg_class source ON source.oid=c.conrelid
       JOIN pg_class target ON target.oid=c.confrelid JOIN pg_namespace n ON n.oid=source.relnamespace
-      WHERE c.contype='f' AND n.nspname=?`, [schema]);
+      WHERE c.contype='f' AND n.nspname=?`,
+      [schema],
+    );
     const references = foreign.rows.filter((row: any) => tables.includes(row.target));
     for (const reference of references) {
       if (!tables.includes(reference.source) && reference.source !== 'gather_site_staff') {
-        throw new errors.IncorrectUsageError({ message: 'An unaudited table references publication data' });
+        throw new errors.IncorrectUsageError({
+          message: 'An unaudited table references publication data',
+        });
       }
-      await tx.raw('ALTER TABLE ??.?? DROP CONSTRAINT ??', [schema, reference.source, reference.conname]);
+      await tx.raw('ALTER TABLE ??.?? DROP CONSTRAINT ??', [
+        schema,
+        reference.source,
+        reference.conname,
+      ]);
     }
-    const unique = await tx.raw(`SELECT t.relname AS table, i.relname AS name, con.conname, idx.indexprs, idx.indpred,
+    const unique = await tx.raw(
+      `SELECT t.relname AS table, i.relname AS name, con.conname, idx.indexprs, idx.indpred,
       ARRAY(SELECT a.attname::text FROM unnest(idx.indkey) WITH ORDINALITY k(num,ord)
         JOIN pg_attribute a ON a.attrelid=idx.indrelid AND a.attnum=k.num ORDER BY k.ord) AS columns
       FROM pg_index idx JOIN pg_class t ON t.oid=idx.indrelid JOIN pg_class i ON i.oid=idx.indexrelid
       JOIN pg_namespace n ON n.oid=t.relnamespace LEFT JOIN pg_constraint con ON con.conindid=idx.indexrelid
-      WHERE n.nspname=? AND idx.indisunique AND NOT idx.indisprimary`, [schema]);
+      WHERE n.nspname=? AND idx.indisunique AND NOT idx.indisprimary`,
+      [schema],
+    );
     for (const index of unique.rows.filter((row: any) => tables.includes(row.table))) {
-      if (index.indexprs || index.indpred || !index.columns.length || index.columns.some((column: any) => !column)) {
-        throw new errors.IncorrectUsageError({ message: 'An expression unique index requires explicit tenancy review' });
+      if (
+        index.indexprs ||
+        index.indpred ||
+        !index.columns.length ||
+        index.columns.some((column: any) => !column)
+      ) {
+        throw new errors.IncorrectUsageError({
+          message: 'An expression unique index requires explicit tenancy review',
+        });
       }
       if (index.conname) {
         await tx.raw('ALTER TABLE ??.?? DROP CONSTRAINT ??', [schema, index.table, index.conname]);
@@ -111,30 +186,57 @@ export async function installTenantIsolation(database: Knex, legacySiteId: strin
         await tx.raw('DROP INDEX ??.??', [schema, index.name]);
       }
       await tx.schema.withSchema(schema).alterTable(index.table, (builder) => {
-        builder.unique(['site_id', ...index.columns], { indexName: constraintName('unique', index.table, index.columns) });
+        builder.unique(['site_id', ...index.columns], {
+          indexName: constraintName('unique', index.table, index.columns),
+        });
       });
     }
     for (const table of tables) {
-      const primary = await tx.raw(`SELECT a.attname FROM pg_index i JOIN pg_class c ON c.oid=i.indrelid
+      const primary = await tx.raw(
+        `SELECT a.attname FROM pg_index i JOIN pg_class c ON c.oid=i.indrelid
         JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum=ANY(i.indkey)
-        WHERE n.nspname=? AND c.relname=? AND i.indisprimary ORDER BY a.attnum`, [schema, table]);
+        WHERE n.nspname=? AND c.relname=? AND i.indisprimary ORDER BY a.attnum`,
+        [schema, table],
+      );
       const columns = primary.rows.map((row: any) => row.attname);
-      if (columns.length !== 1 && !(table === 'automation_trigger_tiers' && columns.length === 0) && !(table === 'automation_action_edges' && columns.length === 2)) {
-        throw new errors.IncorrectUsageError({ message: 'Publication primary-key inventory changed' });
+      if (
+        columns.length !== 1 &&
+        !(table === 'automation_trigger_tiers' && columns.length === 0) &&
+        !(table === 'automation_action_edges' && columns.length === 2)
+      ) {
+        throw new errors.IncorrectUsageError({
+          message: 'Publication primary-key inventory changed',
+        });
       }
       if (columns.length) {
-        await tx.schema.withSchema(schema).alterTable(table, builder => {
-          builder.unique(['site_id', ...columns], { indexName: constraintName('primary', table, columns) });
+        await tx.schema.withSchema(schema).alterTable(table, (builder) => {
+          builder.unique(['site_id', ...columns], {
+            indexName: constraintName('primary', table, columns),
+          });
         });
       }
       await tx.raw('ALTER TABLE ??.?? ALTER COLUMN site_id SET NOT NULL', [schema, table]);
-      await tx.raw('ALTER TABLE ??.?? ALTER COLUMN site_id SET DEFAULT ??.gather_current_site()', [schema, table, schema]);
+      await tx.raw('ALTER TABLE ??.?? ALTER COLUMN site_id SET DEFAULT ??.gather_current_site()', [
+        schema,
+        table,
+        schema,
+      ]);
       await tx.raw('ALTER TABLE ??.?? ENABLE ROW LEVEL SECURITY', [schema, table]);
       await tx.raw('ALTER TABLE ??.?? FORCE ROW LEVEL SECURITY', [schema, table]);
-      await tx.raw('CREATE POLICY gather_tenant ON ??.?? USING (site_id = ??.gather_current_site()) WITH CHECK (site_id = ??.gather_current_site())', [schema, table, schema, schema]);
-      await tx.raw('CREATE POLICY gather_maintenance ON ??.?? TO ?? USING (true) WITH CHECK (true)', [schema, table, owner]);
+      await tx.raw(
+        'CREATE POLICY gather_tenant ON ??.?? USING (site_id = ??.gather_current_site()) WITH CHECK (site_id = ??.gather_current_site())',
+        [schema, table, schema, schema],
+      );
+      await tx.raw(
+        'CREATE POLICY gather_maintenance ON ??.?? TO ?? USING (true) WITH CHECK (true)',
+        [schema, table, owner],
+      );
       if (['users', 'roles', 'roles_users'].includes(table)) {
-        await tx.raw('CREATE POLICY gather_control_roster ON ??.?? FOR SELECT TO ?? USING (true)', [schema, table, controlRole]);
+        await tx.raw('CREATE POLICY gather_control_roster ON ??.?? FOR SELECT TO ?? USING (true)', [
+          schema,
+          table,
+          controlRole,
+        ]);
         await tx.raw('GRANT SELECT ON ??.?? TO ??', [schema, table, controlRole]);
       }
     }
@@ -142,33 +244,69 @@ export async function installTenantIsolation(database: Knex, legacySiteId: strin
       const columns = reference.columns;
       const targets = reference.target_columns;
       const list = (values: string[]) => values.map(() => '??').join(',');
-      const action = ({ a: 'NO ACTION', r: 'RESTRICT', c: 'CASCADE', n: 'SET NULL', d: 'SET DEFAULT' } as Record<string, string>)[reference.deletion];
-      const suffix = reference.deletion === 'n' || reference.deletion === 'd' ? ` (${list(columns)})` : '';
-      await tx.raw(`ALTER TABLE ??.?? ADD CONSTRAINT ?? FOREIGN KEY (${list(['site_id', ...columns])})
+      const action = (
+        { a: 'NO ACTION', r: 'RESTRICT', c: 'CASCADE', n: 'SET NULL', d: 'SET DEFAULT' } as Record<
+          string,
+          string
+        >
+      )[reference.deletion];
+      const suffix =
+        reference.deletion === 'n' || reference.deletion === 'd' ? ` (${list(columns)})` : '';
+      await tx.raw(
+        `ALTER TABLE ??.?? ADD CONSTRAINT ?? FOREIGN KEY (${list(['site_id', ...columns])})
         REFERENCES ??.?? (${list(['site_id', ...targets])}) ON DELETE ${action}${suffix}
         ${reference.deferred ? 'DEFERRABLE ' + (reference.initially_deferred ? 'INITIALLY DEFERRED' : 'INITIALLY IMMEDIATE') : ''}`,
-      [schema, reference.source, constraintName('foreign', reference.source, columns), 'site_id', ...columns,
-        schema, reference.target, 'site_id', ...targets, ...(suffix ? columns : [])]);
+        [
+          schema,
+          reference.source,
+          constraintName('foreign', reference.source, columns),
+          'site_id',
+          ...columns,
+          schema,
+          reference.target,
+          'site_id',
+          ...targets,
+          ...(suffix ? columns : []),
+        ],
+      );
     }
     // These legacy relations lacked foreign keys. Preserve historic dangling
     // audit references, but enforce every new write and reject cross-site joins.
     const extra: Array<[string, string, string]> = [
-      ['roles_users', 'user_id', 'users'], ['roles_users', 'role_id', 'roles'],
-      ['permissions_users', 'user_id', 'users'], ['permissions_users', 'permission_id', 'permissions'],
-      ['permissions_roles', 'role_id', 'roles'], ['permissions_roles', 'permission_id', 'permissions'],
-      ['invites', 'role_id', 'roles'], ['sessions', 'user_id', 'users'],
-      ['api_keys', 'role_id', 'roles'], ['api_keys', 'user_id', 'users'], ['api_keys', 'integration_id', 'integrations'],
-      ['posts', 'published_by', 'users'], ['mobiledoc_revisions', 'post_id', 'posts'],
-      ['post_revisions', 'post_id', 'posts'], ['emails', 'post_id', 'posts'],
-      ['email_recipients', 'member_id', 'members'], ['email_recipient_failures', 'member_id', 'members'],
+      ['roles_users', 'user_id', 'users'],
+      ['roles_users', 'role_id', 'roles'],
+      ['permissions_users', 'user_id', 'users'],
+      ['permissions_users', 'permission_id', 'permissions'],
+      ['permissions_roles', 'role_id', 'roles'],
+      ['permissions_roles', 'permission_id', 'permissions'],
+      ['invites', 'role_id', 'roles'],
+      ['sessions', 'user_id', 'users'],
+      ['api_keys', 'role_id', 'roles'],
+      ['api_keys', 'user_id', 'users'],
+      ['api_keys', 'integration_id', 'integrations'],
+      ['posts', 'published_by', 'users'],
+      ['mobiledoc_revisions', 'post_id', 'posts'],
+      ['post_revisions', 'post_id', 'posts'],
+      ['emails', 'post_id', 'posts'],
+      ['email_recipients', 'member_id', 'members'],
+      ['email_recipient_failures', 'member_id', 'members'],
       ['automated_email_recipients', 'member_id', 'members'],
     ];
     for (const [source, column, target] of extra) {
-      if (references.some((reference: any) => reference.source === source && reference.columns.length === 1 && reference.columns[0] === column)) {
+      if (
+        references.some(
+          (reference: any) =>
+            reference.source === source &&
+            reference.columns.length === 1 &&
+            reference.columns[0] === column,
+        )
+      ) {
         continue;
       }
-      await tx.raw('ALTER TABLE ??.?? ADD CONSTRAINT ?? FOREIGN KEY (site_id, ??) REFERENCES ??.?? (site_id, id) NOT VALID',
-        [schema, source, constraintName('foreign', source, [column]), column, schema, target]);
+      await tx.raw(
+        'ALTER TABLE ??.?? ADD CONSTRAINT ?? FOREIGN KEY (site_id, ??) REFERENCES ??.?? (site_id, id) NOT VALID',
+        [schema, source, constraintName('foreign', source, [column]), column, schema, target],
+      );
     }
     const views = await tx.raw('SELECT viewname FROM pg_views WHERE schemaname = ?', [schema]);
     for (const view of views.rows) {
@@ -179,22 +317,36 @@ export async function installTenantIsolation(database: Knex, legacySiteId: strin
     }
     for (const table of PLATFORM) {
       await tx.raw('REVOKE ALL ON ??.?? FROM PUBLIC', [schema, table]);
-      await tx.raw('GRANT SELECT, INSERT, UPDATE, DELETE ON ??.?? TO ??', [schema, table, controlRole]);
+      await tx.raw('GRANT SELECT, INSERT, UPDATE, DELETE ON ??.?? TO ??', [
+        schema,
+        table,
+        controlRole,
+      ]);
     }
     // A tenant may read only its own explicit staff bindings. It cannot issue
     // or change a binding; control owns grants and runtime auth rechecks it.
     await tx.raw('ALTER TABLE ??.gather_site_staff ENABLE ROW LEVEL SECURITY', [schema]);
     await tx.raw('ALTER TABLE ??.gather_site_staff FORCE ROW LEVEL SECURITY', [schema]);
-    await tx.raw('CREATE POLICY gather_staff_tenant ON ??.gather_site_staff FOR SELECT USING (site_id = ??.gather_current_site())', [schema, schema]);
-    await tx.raw('CREATE POLICY gather_staff_control ON ??.gather_site_staff TO ?? USING (true) WITH CHECK (true)', [schema, controlRole]);
-    await tx.raw('CREATE POLICY gather_staff_maintenance ON ??.gather_site_staff TO ?? USING (true) WITH CHECK (true)', [schema, owner]);
+    await tx.raw(
+      'CREATE POLICY gather_staff_tenant ON ??.gather_site_staff FOR SELECT USING (site_id = ??.gather_current_site())',
+      [schema, schema],
+    );
+    await tx.raw(
+      'CREATE POLICY gather_staff_control ON ??.gather_site_staff TO ?? USING (true) WITH CHECK (true)',
+      [schema, controlRole],
+    );
+    await tx.raw(
+      'CREATE POLICY gather_staff_maintenance ON ??.gather_site_staff TO ?? USING (true) WITH CHECK (true)',
+      [schema, owner],
+    );
     await tx.raw('GRANT USAGE ON SCHEMA ?? TO ??', [schema, controlRole]);
     await tx.raw('REVOKE CREATE ON SCHEMA ?? FROM PUBLIC', [schema]);
     // Only this constrained function can create runtime identities. Control has
     // no CREATE ROLE, database ownership, RLS bypass, or publication write grant.
     const schemaLiteral = schema.replaceAll("'", "''");
     const tableLiteral = JSON.stringify(tables).replaceAll("'", "''");
-    await tx.raw(`CREATE FUNCTION ??.gather_ensure_runtime_role(p_site text, p_password text) RETURNS void
+    await tx.raw(
+      `CREATE FUNCTION ??.gather_ensure_runtime_role(p_site text, p_password text) RETURNS void
       LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $body$
       DECLARE role_name text; table_name text; role_row record;
       BEGIN
@@ -222,28 +374,60 @@ export async function installTenantIsolation(database: Knex, legacySiteId: strin
         END LOOP;
         EXECUTE format('GRANT SELECT ON %I.gather_site_staff TO %I', '${schemaLiteral}', role_name);
         EXECUTE format('GRANT SELECT ON %I.members_resolved_subscription TO %I', '${schemaLiteral}', role_name);
-      END $body$`, [schema, schema]);
-    await tx.raw('REVOKE ALL ON FUNCTION ??.gather_ensure_runtime_role(text,text) FROM PUBLIC', [schema]);
-    await tx.raw('GRANT EXECUTE ON FUNCTION ??.gather_ensure_runtime_role(text,text) TO ??', [schema, controlRole]);
-    await tx('gather_tenancy_state').insert({ key: 'isolation', manifest_hash: TENANT_MANIFEST_HASH, legacy_site_id: legacySiteId, installed_at: new Date() });
+      END $body$`,
+      [schema, schema],
+    );
+    await tx.raw('REVOKE ALL ON FUNCTION ??.gather_ensure_runtime_role(text,text) FROM PUBLIC', [
+      schema,
+    ]);
+    await tx.raw('GRANT EXECUTE ON FUNCTION ??.gather_ensure_runtime_role(text,text) TO ??', [
+      schema,
+      controlRole,
+    ]);
+    await tx('gather_tenancy_state').insert({
+      key: 'isolation',
+      manifest_hash: TENANT_MANIFEST_HASH,
+      legacy_site_id: legacySiteId,
+      installed_at: new Date(),
+    });
   });
 }
 
 export async function verifyTenantDatabase(database: Knex, siteId: string) {
   const role = tenantRole(siteId);
-  const identity = await database.raw(`SELECT session_user AS login, current_user AS role, gather_current_site() AS site,
+  const identity =
+    await database.raw(`SELECT session_user AS login, current_user AS role, gather_current_site() AS site,
     rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolinherit, rolreplication FROM pg_roles WHERE rolname=current_user`);
   const result = identity.rows[0];
-  if (!result || result.login !== role || result.role !== role || result.site !== siteId || result.rolsuper || result.rolbypassrls || result.rolcreaterole || result.rolcreatedb || result.rolinherit || result.rolreplication) {
-    throw new errors.IncorrectUsageError({ message: 'Unsafe or incorrect tenant database identity' });
+  if (
+    !result ||
+    result.login !== role ||
+    result.role !== role ||
+    result.site !== siteId ||
+    result.rolsuper ||
+    result.rolbypassrls ||
+    result.rolcreaterole ||
+    result.rolcreatedb ||
+    result.rolinherit ||
+    result.rolreplication
+  ) {
+    throw new errors.IncorrectUsageError({
+      message: 'Unsafe or incorrect tenant database identity',
+    });
   }
-  const membership = await database.raw('SELECT 1 FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname=current_user)');
+  const membership = await database.raw(
+    'SELECT 1 FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname=current_user)',
+  );
   if (membership.rows.length) {
-    throw new errors.IncorrectUsageError({ message: 'Tenant runtime must not assume another database role' });
+    throw new errors.IncorrectUsageError({
+      message: 'Tenant runtime must not assume another database role',
+    });
   }
   const state = await database('gather_tenancy_state').where({ key: 'isolation' }).first();
   if (state?.manifest_hash !== TENANT_MANIFEST_HASH) {
-    throw new errors.IncorrectUsageError({ message: 'Tenant isolation inventory is not installed' });
+    throw new errors.IncorrectUsageError({
+      message: 'Tenant isolation inventory is not installed',
+    });
   }
   const inventory = await database.raw(`SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity,
     pg_get_userbyid(c.relowner)=current_user AS owned FROM pg_class c
@@ -252,56 +436,149 @@ export async function verifyTenantDatabase(database: Knex, siteId: string) {
     pg_get_expr(p.polqual, p.polrelid) AS predicate, pg_get_expr(p.polwithcheck, p.polrelid) AS assertion
     FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace
     WHERE n.nspname=current_schema() AND EXISTS (SELECT 1 FROM unnest(p.polroles) role WHERE role=0 OR role=(SELECT oid FROM pg_roles WHERE rolname=current_user))`);
-  const safeExpression = (value: string) => /^site_id(?:::text)?=(?:[a-z0-9_]+\.)?gather_current_site$/.test((value || '').replace(/[\s()"']/g, ''));
+  const safeExpression = (value: string) =>
+    /^site_id(?:::text)?=(?:[a-z0-9_]+\.)?gather_current_site$/.test(
+      (value || '').replace(/[\s()"']/g, ''),
+    );
   for (const table of tables) {
     const row = inventory.rows.find((item: any) => item.relname === table);
     if (!row || !row.relrowsecurity || !row.relforcerowsecurity || row.owned) {
       throw new errors.IncorrectUsageError({ message: 'A publishing table is not isolated' });
     }
     const applicable = policies.rows.filter((policy: any) => policy.relname === table);
-    if (applicable.length !== 1 || applicable[0].polname !== 'gather_tenant' || applicable[0].polcmd !== '*' || !applicable[0].polpermissive || !safeExpression(applicable[0].predicate) || !safeExpression(applicable[0].assertion)) {
-      throw new errors.IncorrectUsageError({message: 'A publishing policy differs from the fixed-login boundary'});
+    if (
+      applicable.length !== 1 ||
+      applicable[0].polname !== 'gather_tenant' ||
+      applicable[0].polcmd !== '*' ||
+      !applicable[0].polpermissive ||
+      !safeExpression(applicable[0].predicate) ||
+      !safeExpression(applicable[0].assertion)
+    ) {
+      throw new errors.IncorrectUsageError({
+        message: 'A publishing policy differs from the fixed-login boundary',
+      });
     }
-    const dangerous = await database.raw("SELECT has_table_privilege(current_user, ?, 'TRUNCATE') AS truncate, has_schema_privilege(current_user, current_schema(), 'CREATE') AS create", [table]);
+    const dangerous = await database.raw(
+      "SELECT has_table_privilege(current_user, ?, 'TRUNCATE') AS truncate, has_schema_privilege(current_user, current_schema(), 'CREATE') AS create",
+      [table],
+    );
     if (dangerous.rows[0].truncate || dangerous.rows[0].create) {
-      throw new errors.IncorrectUsageError({ message: 'Tenant runtime has unsafe database privileges' });
+      throw new errors.IncorrectUsageError({
+        message: 'Tenant runtime has unsafe database privileges',
+      });
     }
   }
-  const views = await database.raw("SELECT c.relname, c.reloptions FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=current_schema() AND c.relkind='v'");
-  if (views.rows.length !== 1 || views.rows[0].relname !== 'members_resolved_subscription' || !views.rows[0].reloptions?.includes('security_invoker=true')) throw new errors.IncorrectUsageError({message: 'Publication view isolation differs from the audited inventory'});
+  const views = await database.raw(
+    "SELECT c.relname, c.reloptions FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=current_schema() AND c.relkind='v'",
+  );
+  if (
+    views.rows.length !== 1 ||
+    views.rows[0].relname !== 'members_resolved_subscription' ||
+    !views.rows[0].reloptions?.includes('security_invoker=true')
+  ) {
+    throw new errors.IncorrectUsageError({
+      message: 'Publication view isolation differs from the audited inventory',
+    });
+  }
 }
 
 // pg_dump --no-privileges deliberately omits ACLs. Run only as the same
 // migration owner on an isolated restored database, before exposing runtimes.
 // Preserve restored row policies and data; reissue only audited privileges.
 export async function restoreTenantPrivileges(database: Knex, controlRole: string) {
-  if (database.client.config.client !== 'pg' || !ROLE.test(controlRole) || controlRole.startsWith('gather_site_')) throw new errors.IncorrectUsageError({message: 'Invalid restore control role'});
-  await database.transaction(async tx => {
-    const state = await tx('gather_tenancy_state').where({key: 'isolation'}).first();
-    if (state?.manifest_hash !== TENANT_MANIFEST_HASH) throw new errors.IncorrectUsageError({message: 'Restored tenancy inventory differs from the running release'});
-    const control = await tx.raw('SELECT rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolinherit, rolreplication FROM pg_roles WHERE rolname=?', [controlRole]);
-    if (!control.rows.length || Object.values(control.rows[0]).some(Boolean)) throw new errors.IncorrectUsageError({message: 'Unsafe restore control role'});
-    if ((await tx.raw('SELECT 1 FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname=?)', [controlRole])).rows.length) throw new errors.IncorrectUsageError({message: 'Restore control role memberships are forbidden'});
-    const {rows: [{schema, owner}]} = await tx.raw('SELECT current_schema() AS schema, current_user AS owner');
-    const policies = await tx.raw(`SELECT c.relname, pg_get_userbyid(role) AS owner FROM pg_policy p
+  if (
+    database.client.config.client !== 'pg' ||
+    !ROLE.test(controlRole) ||
+    controlRole.startsWith('gather_site_')
+  ) {
+    throw new errors.IncorrectUsageError({ message: 'Invalid restore control role' });
+  }
+  await database.transaction(async (tx) => {
+    const state = await tx('gather_tenancy_state').where({ key: 'isolation' }).first();
+    if (state?.manifest_hash !== TENANT_MANIFEST_HASH) {
+      throw new errors.IncorrectUsageError({
+        message: 'Restored tenancy inventory differs from the running release',
+      });
+    }
+    const control = await tx.raw(
+      'SELECT rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolinherit, rolreplication FROM pg_roles WHERE rolname=?',
+      [controlRole],
+    );
+    if (!control.rows.length || Object.values(control.rows[0]).some(Boolean)) {
+      throw new errors.IncorrectUsageError({ message: 'Unsafe restore control role' });
+    }
+    if (
+      (
+        await tx.raw(
+          'SELECT 1 FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname=?)',
+          [controlRole],
+        )
+      ).rows.length
+    ) {
+      throw new errors.IncorrectUsageError({
+        message: 'Restore control role memberships are forbidden',
+      });
+    }
+    const {
+      rows: [{ schema, owner }],
+    } = await tx.raw('SELECT current_schema() AS schema, current_user AS owner');
+    const policies = await tx.raw(
+      `SELECT c.relname, pg_get_userbyid(role) AS owner FROM pg_policy p
       JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace,
-      unnest(p.polroles) role WHERE n.nspname=? AND p.polname='gather_maintenance'`, [schema]);
-    if (tables.some(table => policies.rows.filter((row: any) => row.relname === table && row.owner === owner).length !== 1)) throw new errors.IncorrectUsageError({message: 'Restore must use the original migration owner'});
-    const staffPolicy = await tx.raw(`SELECT pg_get_userbyid(role) AS role FROM pg_policy p
+      unnest(p.polroles) role WHERE n.nspname=? AND p.polname='gather_maintenance'`,
+      [schema],
+    );
+    if (
+      tables.some(
+        (table) =>
+          policies.rows.filter((row: any) => row.relname === table && row.owner === owner)
+            .length !== 1,
+      )
+    ) {
+      throw new errors.IncorrectUsageError({
+        message: 'Restore must use the original migration owner',
+      });
+    }
+    const staffPolicy = await tx.raw(
+      `SELECT pg_get_userbyid(role) AS role FROM pg_policy p
       JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace,
-      unnest(p.polroles) role WHERE n.nspname=? AND c.relname='gather_site_staff' AND p.polname='gather_staff_control'`, [schema]);
-    if (staffPolicy.rows.length !== 1 || staffPolicy.rows[0].role !== controlRole) throw new errors.IncorrectUsageError({message: 'Restore control identity differs from the retained policy'});
-    const functionOwner = await tx.raw(`SELECT pg_get_userbyid(p.proowner)=current_user AS owned FROM pg_proc p
-      JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname=? AND p.proname='gather_ensure_runtime_role'`, [schema]);
-    if (functionOwner.rows.length !== 1 || !functionOwner.rows[0].owned) throw new errors.IncorrectUsageError({message: 'Restore runtime issuer is not owned by the migration identity'});
+      unnest(p.polroles) role WHERE n.nspname=? AND c.relname='gather_site_staff' AND p.polname='gather_staff_control'`,
+      [schema],
+    );
+    if (staffPolicy.rows.length !== 1 || staffPolicy.rows[0].role !== controlRole) {
+      throw new errors.IncorrectUsageError({
+        message: 'Restore control identity differs from the retained policy',
+      });
+    }
+    const functionOwner = await tx.raw(
+      `SELECT pg_get_userbyid(p.proowner)=current_user AS owned FROM pg_proc p
+      JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname=? AND p.proname='gather_ensure_runtime_role'`,
+      [schema],
+    );
+    if (functionOwner.rows.length !== 1 || !functionOwner.rows[0].owned) {
+      throw new errors.IncorrectUsageError({
+        message: 'Restore runtime issuer is not owned by the migration identity',
+      });
+    }
     await tx.raw('REVOKE CREATE ON SCHEMA ?? FROM PUBLIC', [schema]);
-    await tx.raw('REVOKE ALL ON FUNCTION ??.gather_ensure_runtime_role(text,text) FROM PUBLIC', [schema]);
-    await tx.raw('GRANT EXECUTE ON FUNCTION ??.gather_ensure_runtime_role(text,text) TO ??', [schema, controlRole]);
+    await tx.raw('REVOKE ALL ON FUNCTION ??.gather_ensure_runtime_role(text,text) FROM PUBLIC', [
+      schema,
+    ]);
+    await tx.raw('GRANT EXECUTE ON FUNCTION ??.gather_ensure_runtime_role(text,text) TO ??', [
+      schema,
+      controlRole,
+    ]);
     await tx.raw('GRANT USAGE ON SCHEMA ?? TO ??', [schema, controlRole]);
     for (const table of PLATFORM) {
       await tx.raw('REVOKE ALL ON ??.?? FROM PUBLIC', [schema, table]);
-      await tx.raw('GRANT SELECT, INSERT, UPDATE, DELETE ON ??.?? TO ??', [schema, table, controlRole]);
+      await tx.raw('GRANT SELECT, INSERT, UPDATE, DELETE ON ??.?? TO ??', [
+        schema,
+        table,
+        controlRole,
+      ]);
     }
-    for (const table of ['users', 'roles', 'roles_users']) await tx.raw('GRANT SELECT ON ??.?? TO ??', [schema, table, controlRole]);
+    for (const table of ['users', 'roles', 'roles_users']) {
+      await tx.raw('GRANT SELECT ON ??.?? TO ??', [schema, table, controlRole]);
+    }
   });
 }

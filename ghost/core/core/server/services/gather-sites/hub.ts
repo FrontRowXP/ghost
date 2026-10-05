@@ -69,7 +69,10 @@ export function createSiteHub({
   apiOrigin: string;
   now?: () => number;
   fetch?: typeof globalThis.fetch;
-  staffLogin?: {read(flow: string): Promise<{name: string}>; complete(flow: string, principal: Principal, delegation: Delegation): Promise<string>};
+  staffLogin?: {
+    read(flow: string): Promise<{ name: string }>;
+    complete(flow: string, principal: Principal, delegation: Delegation): Promise<string>;
+  };
 }) {
   const COOKIE = cookiePath === '/' ? '__Host-frontro-sites-session' : LEGACY_COOKIE;
   const cookieOptions = {
@@ -83,7 +86,8 @@ export function createSiteHub({
     getAdminOrigin: () => origin,
     getAdminPath: () => cookiePath,
     handoffStore: handoffs,
-    bindingCookie: cookiePath === '/' ? '__Host-frontro-sites-handoff' : '__Secure-frontro-sites-handoff',
+    bindingCookie:
+      cookiePath === '/' ? '__Host-frontro-sites-handoff' : '__Secure-frontro-sites-handoff',
     now,
     fetch,
     async acceptIdentity(req: Request, res: Response, raw: unknown, delegation: Delegation) {
@@ -144,27 +148,40 @@ export function createSiteHub({
     },
     async session(req: Request, res: Response) {
       const { session, principal } = await current(req);
-      return res.json({ ...principal, csrfToken: session.csrf, creationEnabled: registry.creationEnabled === true });
+      return res.json({
+        ...principal,
+        csrfToken: session.csrf,
+        creationEnabled: registry.creationEnabled === true,
+      });
     },
     async browse(req: Request, res: Response) {
       const { principal } = await current(req);
-      return res.json({ sites: await registry.browse(principal), creationEnabled: registry.creationEnabled === true });
+      return res.json({
+        sites: await registry.browse(principal),
+        creationEnabled: registry.creationEnabled === true,
+      });
     },
     async create(req: Request, res: Response) {
       const { session, principal } = await current(req);
       csrf(req, session);
       const site = await registry.create(req.body || {}, principal);
-      return res.status(201).json({site});
+      return res.status(201).json({ site });
     },
     async readStaffLogin(req: Request, res: Response) {
-      if (!staffLogin || typeof req.query.flow !== 'string' || !TOKEN.test(req.query.flow)) throw new SitesError({statusCode: 404, code: 'site_not_found'});
+      if (!staffLogin || typeof req.query.flow !== 'string' || !TOKEN.test(req.query.flow)) {
+        throw new SitesError({ statusCode: 404, code: 'site_not_found' });
+      }
       return res.json(await staffLogin.read(req.query.flow));
     },
     async completeStaffLogin(req: Request, res: Response) {
-      const {session, principal} = await current(req);
+      const { session, principal } = await current(req);
       csrf(req, session);
-      if (!staffLogin || !TOKEN.test(req.body?.flow || '')) throw new SitesError({statusCode: 404, code: 'site_not_found'});
-      return res.json({redirect: await staffLogin.complete(req.body.flow, principal, session.delegation)});
+      if (!staffLogin || !TOKEN.test(req.body?.flow || '')) {
+        throw new SitesError({ statusCode: 404, code: 'site_not_found' });
+      }
+      return res.json({
+        redirect: await staffLogin.complete(req.body.flow, principal, session.delegation),
+      });
     },
     async logout(req: Request, res: Response) {
       const token = tokenFrom(req, COOKIE);

@@ -13,6 +13,7 @@ const urlUtils = require('../../../../shared/url-utils').default;
 const config = require('../../../../shared/config');
 const { blogIcon } = require('../../../lib/image');
 const url = require('url');
+const { createFrontroAuth } = require('../frontro-auth');
 
 // TODO: We have too many lines here, should move functions out into a utils module
 
@@ -75,7 +76,35 @@ const sessionService = createSessionService({
   t,
 });
 
+const frontroAuth = createFrontroAuth({
+  getConfig: () => config.get('security:frontroAuth'),
+  getAdminOrigin: () => new URL(urlUtils.getAdminUrl() || urlUtils.getSiteUrl()).origin,
+  getSession: expressSession.getSession,
+  findUserById: id => models.User.findOne({ id, status: 'active' }),
+  createSession: sessionService.createVerifiedSessionForUser,
+});
+
+const getUserForSession = sessionService.getUserForSession;
+sessionService.getUserForSession = async (req, res) => {
+  const user = await getUserForSession(req, res);
+  if (user && !(await frontroAuth.validate(req.session))) {
+    await new Promise((resolve, reject) => req.session.destroy(error => error ? reject(error) : resolve()));
+    return null;
+  }
+  return user;
+};
+const removeUserForSession = sessionService.removeUserForSession;
+sessionService.removeUserForSession = async (req, res) => {
+  const session = await expressSession.getSession(req, res);
+  const upstream = session.frontroSession;
+  delete session.frontroSession;
+  delete session.frontroHandoff;
+  await removeUserForSession(req, res);
+  await frontroAuth.revoke(upstream);
+};
+
 module.exports = createSessionMiddleware({ sessionService });
+module.exports.frontroAuth = frontroAuth;
 
 // Looks funky but this is a "custom" piece of middleware
 module.exports.createSessionFromToken = () => {

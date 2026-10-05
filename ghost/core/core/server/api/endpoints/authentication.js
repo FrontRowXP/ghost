@@ -31,6 +31,19 @@ const messages = {
 const controller = {
   docName: 'authentication',
 
+  frontroStart: {
+    permissions: false,
+    query() {
+      return frontroMiddleware('start');
+    },
+  },
+  frontroComplete: {
+    permissions: false,
+    query() {
+      return frontroMiddleware('complete');
+    },
+  },
+
   setup: {
     statusCode: 201,
     permissions: false,
@@ -260,3 +273,17 @@ const controller = {
 };
 
 module.exports = controller;
+
+function frontroMiddleware(method) {
+  return async (req, res, next) => {
+    try {
+      await auth.session.frontroAuth[method](req, res);
+    } catch (error) {
+      const ErrorType = error.statusCode === 403 ? errors.NoPermissionError
+        : error.statusCode === 404 ? errors.NotFoundError
+          : error.statusCode === 401 ? errors.UnauthorizedError
+            : error.statusCode === 429 ? errors.TooManyRequestsError : errors.InternalServerError;
+      next(new ErrorType({ message: error.statusCode ? error.message : 'frontro_auth_unavailable' }));
+    }
+  };
+}

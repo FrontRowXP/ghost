@@ -46,6 +46,15 @@ export interface CompleteSetupPayload {
 // their 401s are answers rather than an expired session.
 const authenticationRequestOptions = { retry: false, sessionExpiryRedirect: false } as const;
 
+export const useStartFrontroAuth = createMutation<{ id: string; code: string }, void>({
+  method: 'POST', path: () => '/authentication/frontro/start/', body: () => ({}),
+  ...authenticationRequestOptions,
+});
+export const useCompleteFrontroAuth = createMutation<{ authenticated: boolean }, void>({
+  method: 'POST', path: () => '/authentication/frontro/complete/', body: () => ({}),
+  ...authenticationRequestOptions,
+});
+
 // Requests
 
 export const useSetupStatus = createQuery<SetupStatusResponseType>({

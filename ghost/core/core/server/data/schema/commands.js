@@ -717,6 +717,14 @@ async function createViewOrReplace(name, viewSql, transaction = db.knex) {
     return;
   }
 
+  if (transaction.client.config.client === 'pg') {
+    await transaction.raw(
+      'CREATE OR REPLACE VIEW ?? WITH (security_invoker = true) AS ' + viewSql,
+      [name],
+    );
+    return;
+  }
+
   await transaction.schema.createViewOrReplace(name, function (view) {
     view.as(transaction.raw(viewSql));
   });

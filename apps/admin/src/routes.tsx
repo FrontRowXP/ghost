@@ -47,6 +47,7 @@ import {
 } from '@tryghost/admin-x-framework/api/users';
 
 import { NotFound } from './shared/not-found';
+import SiteHub from './sites/site-hub';
 import { type AuthRouteHandle, authRoutes, useAuthScreensOwner } from './auth/api';
 
 // Routes handled by the Ember admin app. React delegates these to Ember via
@@ -213,6 +214,7 @@ const appRoutes: RouteObject[] = [
 ];
 
 export const routes: RouteObject[] = [
+  {path: '/sites/*', Component: SiteHub, handle: {allowInForceUpgrade: true}},
   // Outside the guards: signed-out visitors have no user or settings to check.
   ...authRoutes,
   {

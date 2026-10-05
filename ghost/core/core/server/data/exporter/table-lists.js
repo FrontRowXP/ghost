@@ -121,6 +121,14 @@ const SETTING_KEYS_BLOCKLIST = [
 ];
 
 module.exports = {
+  // Platform metadata is backed up by the operator's encrypted PostgreSQL
+  // snapshot, never by a publication export (including explicit include lists).
+  PLATFORM_TABLES: [
+    'gather_sites',
+    'gather_site_domains',
+    'gather_site_staff',
+    'gather_tenancy_state',
+  ],
   BACKUP_TABLES,
   TABLES_ALLOWLIST,
   SETTING_KEYS_BLOCKLIST,

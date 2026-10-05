@@ -1,3 +1,4 @@
+const tenantConflictColumns = require('../../lib/gather/conflict-columns');
 import errors from '@tryghost/errors';
 import { z } from 'zod';
 import { AUTOMATION_STEP_TERMINAL_STATUSES } from './automations-repository';
@@ -787,7 +788,7 @@ async function ensureAutomation(
       created_at: now,
       updated_at: now,
     })
-    .onConflict('slug')
+    .onConflict(tenantConflictColumns('slug'))
     .ignore();
 
   return requireAutomation(await loadAutomationBySlug(trx, defaults.slug), defaults.slug);

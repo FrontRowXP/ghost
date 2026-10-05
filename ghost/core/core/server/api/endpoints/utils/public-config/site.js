@@ -29,8 +29,15 @@ module.exports = function getSiteProperties() {
   };
 
   const frontroAuth = publicConfiguration(config.get('security:frontroAuth'));
+  const siteHub = require('../../../../services/gather-sites').getHub();
+  if (siteHub) siteProperties.gatherSites = siteHub.capability;
+  if (config.get('gather:tenant:siteId')) {
+    siteProperties.gatherSites = {...config.get('gather:tenant:hubCapability')};
+    if (new URL(config.get('url')).origin !== config.get('gather:tenant:hubOrigin')) siteProperties.gatherSites.hubUrl = config.get('gather:tenant:hubOrigin') + '/ghost/#/sites';
+  }
   if (frontroAuth) {
     siteProperties.frontroAuth = frontroAuth;
+    if (config.get('gather:tenant:siteId')) siteProperties.frontroAuth.siteSignInUrl = '/ghost/_gather/signin/start/';
     siteProperties.authReact = true;
   }
 

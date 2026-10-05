@@ -17,12 +17,12 @@ function getExpressSessionMiddleware() {
       secret: settingsCache.get('admin_session_secret'),
       resave: false,
       saveUninitialized: false,
-      name: 'ghost-admin-api-session',
+      name: config.get('gather:tenant:siteId') ? '__Host-gather-admin-session' : 'ghost-admin-api-session',
       cookie: {
         maxAge: config.get('admin:sessionMaxAgeMs'),
         httpOnly: true,
-        path: urlUtils.getSubdir() + '/ghost',
-        sameSite: urlUtils.isSSL(config.get('url')) ? 'none' : 'lax',
+        path: config.get('gather:tenant:siteId') ? '/' : urlUtils.getSubdir() + '/ghost',
+        sameSite: config.get('gather:tenant:siteId') ? 'lax' : urlUtils.isSSL(config.get('url')) ? 'none' : 'lax',
         secure: urlUtils.isSSL(config.get('url')),
       },
     });

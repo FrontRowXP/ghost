@@ -18,6 +18,32 @@ jobs:
     name: Gather compatibility
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: gather_test
+          POSTGRES_PASSWORD: gather_test
+          POSTGRES_DB: gather_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U gather_test" --health-interval 10s
+          --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 10s
+          --health-timeout 5s --health-retries 5
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_HOST: '%'
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -proot" --health-interval 10s
+          --health-timeout 5s --health-retries 10
     env:
       NX_DAEMON: 'false'
       NX_NATIVE_COMMAND_RUNNER: 'false'
@@ -37,20 +63,40 @@ jobs:
         run: pnpm --filter-prod 'ghost^...' -r run build
       - name: Build the production frontend and backend
         run: pnpm build:production
+      - name: Preserve reviewable compiled site-management UI
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gather-admin-preview
+          path: ghost/core/core/built/admin
+          retention-days: 3
       - name: Configuration and publishing regression tests
         working-directory: ghost/core
-        run: pnpm exec vitest run test/unit/shared/config/utils.test.js test/unit/server/models/post.test.js test/unit/frontend/web/middleware/serve-public-file.test.js --maxWorkers=2
+        run: pnpm exec vitest run test/unit/shared/config/utils.test.js test/unit/server/models/post.test.js test/unit/server/models/automation.test.js test/unit/frontend/web/middleware/serve-public-file.test.js --maxWorkers=2
       - name: Private NAS gateway boundary tests
         working-directory: ghost/core
-        run: node --import=tsx --conditions=source --test scripts/gather-assets.test.mjs scripts/gather-origin.test.mjs
+        run: node --import=tsx --conditions=source --test scripts/gather-assets.test.mjs scripts/gather-origin.test.mjs scripts/gather-worker-config.test.mjs scripts/gather-http.test.mjs
       - name: Frontro staff authentication boundary tests
         run: node --experimental-strip-types --test ghost/core/scripts/frontro-auth.test.cjs ghost/core/scripts/frontro-auth-client.test.cjs ghost/core/scripts/frontro-auth-serialization.test.cjs
+      - name: Gather registry and session boundaries
+        working-directory: ghost/core
+        env:
+          GATHER_DISPOSABLE_CI: '1'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client-16
+          node --import=tsx --conditions=source --test scripts/gather-tenancy.test.mjs scripts/gather-registry.integration.mjs scripts/gather-isolation.integration.mjs
+          node --import=tsx --conditions=source --test scripts/gather-runtime.integration.mjs
+          node --test scripts/gather-sites-api.test.cjs scripts/gather-scheduler.test.cjs scripts/gather-native-auth.test.cjs
+          pnpm exec vitest run test/unit/server/data/schema/integrity.test.ts test/unit/server/data/exporter/index.test.js --maxWorkers=2
+          pnpm exec vitest run -c vitest.config.db.ts --project e2e-api test/e2e-api/admin/gather-sites.test.js test/e2e-api/admin/frontro-auth.test.js --maxWorkers=2
       - name: Install the isolated acceptance browser
         run: pnpm --filter @tryghost/admin exec playwright install --with-deps chromium
       - name: Frontro authentication and older-backend browser acceptance
-        run: pnpm --filter @tryghost/admin test:acceptance src/auth/frontro/frontro-signin.acceptance.test.tsx src/auth/signin.acceptance.test.tsx src/layout/frontro-signout.acceptance.test.tsx
+        run: pnpm --filter @tryghost/admin test:acceptance src/sites/site-hub.acceptance.test.tsx src/auth/frontro/frontro-signin.acceptance.test.tsx src/auth/signin.acceptance.test.tsx src/layout/frontro-signout.acceptance.test.tsx
       - name: Deployment qualification gate tests
-        run: python3 -m unittest discover -s infra/deployer -p 'test_*.py'
+        run: |
+          python3 -m unittest discover -s infra/deployer -p 'test_*.py'
+          node --test infra/deployer/backup-boundary.test.mjs
       - name: Build the bundled public search frontend
         run: pnpm --filter @tryghost/sodo-search run build
       - name: Build and qualify Frontro public branding
@@ -66,3 +112,22 @@ jobs:
         run: |
           unexpected=$(find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) ! -name gather.yml)
           test -z "$unexpected"
+      - name: Prepare focused Gather formatting review
+        run: |
+          pnpm --filter @tryghost/admin-x-framework exec eslint --fix src/api/gather-sites.ts || true
+          pnpm --filter @tryghost/admin exec eslint --fix src/sites/site-hub.tsx src/sites/site-hub.acceptance.test.tsx || true
+          pnpm --filter ghost exec eslint --fix core/server/lib/gather/*.ts core/server/lib/gather/bootstrap.js core/server/lib/gather/conflict-columns.js core/server/lib/gather/scheduler-callback.js core/server/lib/gather/native-auth.js core/server/models/base/plugins/events.js core/server/adapters/scheduling/scheduling-default.ts core/server/services/gather-sites/*.ts core/server/api/endpoints/gather-sites.js core/server/data/schema/gather-registry.js core/server/data/migrations/versions/6.68/2026-10-05-18-46-25-add-gather-site-registry.js core/server/data/migrations/versions/6.68/2026-10-05-19-39-53-add-shared-publication-tenancy-columns.js test/e2e-api/admin/gather-sites.test.js core/server/models/automation.js test/unit/server/models/automation.test.js || true
+          node scripts/format.js ghost/core/scripts/gather-native-auth.test.cjs ghost/core/core/server/web/api/endpoints/admin/routes.js ghost/core/scripts/gather-http.mjs ghost/core/scripts/gather-http.test.mjs ghost/core/scripts/gather-ready.mjs ghost/core/scripts/gather-operator.mjs ghost/core/core/server/adapters/scheduling/scheduling-default.ts ghost/core/core/server/models/base/plugins/events.js ghost/core/scripts/gather-runtime.integration.mjs ghost/core/scripts/gather-scheduler.test.cjs infra/deployer/backup.mjs infra/deployer/backup-boundary.mjs infra/deployer/backup-boundary.test.mjs apps/admin/src/sites apps/admin-x-framework/src/api/gather-sites.ts ghost/core/core/server/lib/gather ghost/core/core/server/services/gather-sites ghost/core/core/server/api/endpoints/gather-sites.js ghost/core/core/server/data/schema/gather-registry.js ghost/core/core/server/data/migrations/versions/6.68/2026-10-05-18-46-25-add-gather-site-registry.js ghost/core/core/server/data/migrations/versions/6.68/2026-10-05-19-39-53-add-shared-publication-tenancy-columns.js ghost/core/core/server/data/schema/commands.js ghost/core/core/server/data/schema/schema.js ghost/core/core/server/data/exporter/exporter.js ghost/core/core/server/data/exporter/table-lists.js ghost/core/test/unit/server/data/schema/integrity.test.ts ghost/core/test/unit/server/data/exporter/index.test.js ghost/core/scripts/gather-isolation.integration.mjs ghost/core/scripts/gather-supervisor.mjs ghost/core/scripts/gather-worker-config.mjs ghost/core/scripts/gather-worker-config.test.mjs ghost/core/scripts/gather-tenancy.test.mjs ghost/core/scripts/gather-registry.integration.mjs ghost/core/test/e2e-api/admin/gather-sites.test.js ghost/core/core/server/models/automation.js ghost/core/test/unit/server/models/automation.test.js docs/hosting/gather-tenancy.md
+          git diff --binary > "$RUNNER_TEMP/gather-format.patch"
+      - name: Preserve formatting corrections
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gather-format-corrections
+          path: ${{ runner.temp }}/gather-format.patch
+          retention-days: 3
+      - name: Focused Gather source lint
+        run: |
+          pnpm --filter @tryghost/admin-x-framework exec eslint src/api/gather-sites.ts
+          pnpm --filter @tryghost/admin exec eslint src/sites/site-hub.tsx src/sites/site-hub.acceptance.test.tsx
+          pnpm --filter ghost exec eslint core/server/lib/gather/*.ts core/server/lib/gather/bootstrap.js core/server/lib/gather/conflict-columns.js core/server/lib/gather/scheduler-callback.js core/server/lib/gather/native-auth.js core/server/models/base/plugins/events.js core/server/adapters/scheduling/scheduling-default.ts core/server/services/gather-sites/*.ts core/server/api/endpoints/gather-sites.js core/server/data/schema/gather-registry.js core/server/data/migrations/versions/6.68/2026-10-05-18-46-25-add-gather-site-registry.js core/server/data/migrations/versions/6.68/2026-10-05-19-39-53-add-shared-publication-tenancy-columns.js test/e2e-api/admin/gather-sites.test.js core/server/models/automation.js test/unit/server/models/automation.test.js
+          git diff --exit-code

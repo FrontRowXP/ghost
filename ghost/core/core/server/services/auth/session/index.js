@@ -79,9 +79,18 @@ const sessionService = createSessionService({
 const frontroAuth = createFrontroAuth({
   getConfig: () => config.get('security:frontroAuth'),
   getAdminOrigin: () => new URL(urlUtils.getAdminUrl() || urlUtils.getSiteUrl()).origin,
+  getUpstreamOrigin: () => config.get('gather:tenant:hubOrigin') || new URL(urlUtils.getAdminUrl() || urlUtils.getSiteUrl()).origin,
   getAdminPath: () => urlUtils.getSubdir() + '/ghost',
   findUserById: id => models.User.findOne({ id, status: 'active' }),
   createSession: sessionService.createVerifiedSessionForUser,
+  resolveStaff: config.get('gather:tenant:siteId') ? async (subject, identity) => {
+    const siteId = config.get('gather:tenant:siteId');
+    const workspaceId = config.get('gather:tenant:workspaceId');
+    if (!identity?.workspaces?.some(workspace => workspace.id === workspaceId && ['owner', 'member'].includes(workspace.role))) return null;
+    const database = require('../../../data/db').knex;
+    const binding = await database('gather_site_staff').where({site_id: siteId, subject_id: subject}).first();
+    return binding?.staff_id || null;
+  } : undefined,
 });
 
 const getUserForSession = sessionService.getUserForSession;
@@ -98,7 +107,7 @@ sessionService.removeUserForSession = async (req, res) => {
   const session = await expressSession.getSession(req, res);
   const upstream = session.frontroSession;
   delete session.frontroSession;
-  frontroAuth.discard(req, res);
+  await frontroAuth.discard(req, res);
   await removeUserForSession(req, res);
   await frontroAuth.revoke(upstream);
 };

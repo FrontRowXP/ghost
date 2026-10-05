@@ -1,8 +1,10 @@
 const _ = require('lodash');
 const debug = require('@tryghost/debug')('models:base:model-events');
 const ObjectId = require('bson-objectid').default;
+const { InternalServerError } = require('@tryghost/errors');
 
 const schema = require('../../../data/schema');
+const config = require('../../../../shared/config');
 
 // This wires up our model event system
 const events = require('../../../lib/common/events');
@@ -145,6 +147,18 @@ module.exports = function (Bookshelf) {
        * Exceptions: internal context or importing
        */
       onCreating: function onCreating(model, attr, options) {
+        const siteId = config.get('gather:tenant:siteId');
+        if (siteId && Object.hasOwn(schema.tables[this.tableName], 'site_id')) {
+          const supplied = model.get('site_id');
+          if (supplied && supplied !== siteId) {
+            throw new InternalServerError({
+              message: 'A publication model cannot change its fixed site identity',
+            });
+          }
+          // Bookshelf explicitly fills missing schema fields with null below,
+          // so the database default alone cannot handle model-created rows.
+          model.set('site_id', siteId);
+        }
         if (Object.hasOwn(schema.tables[this.tableName], 'created_at')) {
           if (!model.get('created_at')) {
             model.set('created_at', new Date());

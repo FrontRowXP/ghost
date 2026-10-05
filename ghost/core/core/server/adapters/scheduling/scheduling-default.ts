@@ -3,10 +3,12 @@ import createDebug from '@tryghost/debug';
 import logging from '@tryghost/logging';
 import errors, { type GhostError } from '@tryghost/errors';
 import request from '@tryghost/request';
+import config from '../../../shared/config';
 import {
   SchedulingBase,
   type SchedulerJob as BaseSchedulerJob,
 } from '@tryghost/adapter-base-scheduling';
+const { tenantCallback } = require('../../lib/gather/scheduler-callback');
 
 type SchedulerJob = BaseSchedulerJob & {
   tries?: number;
@@ -175,7 +177,11 @@ export default class SchedulingDefault extends SchedulingBase {
       }
     }
 
-    return this.request(url, options).catch((err: GhostError) => {
+    const callback = tenantCallback(url, config);
+    if (callback.headers) {
+      options.headers = callback.headers;
+    }
+    return this.request(callback.url, options).catch((err: GhostError) => {
       const { statusCode } = err;
 
       // CASE: post/page was deleted already

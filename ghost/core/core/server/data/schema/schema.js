@@ -2641,3 +2641,10 @@ module.exports = {
     updated_at: { type: 'dateTime', nullable: true },
   },
 };
+
+// Gather control-plane records share the existing database.
+Object.assign(module.exports, require('./gather-registry'));
+
+for (const table of require('../../lib/gather/tenant-tables.json')) {
+  module.exports[table].site_id = { type: 'string', maxlength: 36, nullable: true, index: true };
+}

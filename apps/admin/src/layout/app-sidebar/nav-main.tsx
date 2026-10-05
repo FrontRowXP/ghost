@@ -50,6 +50,7 @@ function NavMain({ ...props }: React.ComponentProps<typeof SidebarGroup>) {
     <SidebarGroup {...props}>
       <SidebarGroupContent>
         <SidebarMenu>
+          {site.data?.site.gatherSites && <NavMenuItem><NavMenuItem.Link to="sites"><LucideIcon.AppWindow /><NavMenuItem.Label>Your sites</NavMenuItem.Label></NavMenuItem.Link></NavMenuItem>}
           <NavMenuItem>
             <NavMenuItem.Link
               isActive={isAnalyticsRouteActive || isPostAnalyticsRouteActive}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCompleteFrontroAuth, useStartFrontroAuth } from '@tryghost/admin-x-framework/api/authentication';
+import { useBrowseSite } from '@tryghost/admin-x-framework/api/site';
 import { AuthModal } from './moments/AuthModal';
 import { AuthError, authMessage, authRequest, type Session } from './moments/client';
 import { reloadAdmin } from '../reload';
@@ -7,6 +8,7 @@ import { takeSigninRedirect } from '../signin-redirect';
 import './moments/auth.css';
 
 export default function FrontroSignin({ apiOrigin }: { apiOrigin: string }) {
+  const { data: site } = useBrowseSite();
   const start = useStartFrontroAuth();
   const complete = useCompleteFrontroAuth();
   const [checking, setChecking] = useState(true);
@@ -42,6 +44,11 @@ export default function FrontroSignin({ apiOrigin }: { apiOrigin: string }) {
 
   useEffect(() => {
     active.current = true;
+    if (!site) return () => {active.current = false;};
+    if (site?.site.frontroAuth?.siteSignInUrl) {
+      location.assign(site.site.frontroAuth.siteSignInUrl);
+      return () => { active.current = false; };
+    }
     if (skipAutoConnect.current) {
       sessionStorage.removeItem('frontro-explicit-signout');
       setChecking(false);
@@ -58,11 +65,12 @@ export default function FrontroSignin({ apiOrigin }: { apiOrigin: string }) {
       })
       .finally(() => { if (active.current) setChecking(false); });
     return () => { active.current = false; };
-  }, [apiOrigin, connect]);
+  }, [apiOrigin, connect, Boolean(site), site?.site.frontroAuth?.siteSignInUrl]);
 
   if (checking) return <main className="auth-screen auth-surface"><p role="status">Opening Gather…</p></main>;
   return <>
     <AuthModal apiOrigin={apiOrigin} onAuthenticated={connect} onClose={() => location.assign('/')} />
+    {site?.site.gatherSites && <a className="frontro-sites-entry" href="#/sites">Manage your sites or create an account</a>}
     {error && <div className="frontro-connection-error" role="alert">{error}</div>}
   </>;
 }

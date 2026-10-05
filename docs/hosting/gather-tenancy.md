@@ -105,8 +105,10 @@ Operator backups include both object prefixes, one exported PostgreSQL snapshot,
 the isolation manifest, original migration/control identities, site IDs and table
 counts. Database privileges are deliberately excluded; credentials stay private.
 
-Restore into an isolated non-public recovery database as the original migration
-owner. Create the original constrained control role before restoring because RLS
+Restore into a separate isolated, non-public PostgreSQL cluster as the original
+migration owner. Role identities and passwords are cluster-wide: a recovery
+database in the live cluster would alter live runtime credentials. Create the
+original constrained control role before restoring because RLS
 policies refer to it. Restore the decrypted snapshot with the matching PostgreSQL
 client, preserving all policies/functions/data. Validate manifest, counts and
 object hashes. Before exposing runtimes, run

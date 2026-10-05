@@ -4,11 +4,11 @@ import logging from '@tryghost/logging';
 import errors, { type GhostError } from '@tryghost/errors';
 import request from '@tryghost/request';
 import config from '../../../shared/config';
-const {tenantCallback} = require('../../lib/gather/scheduler-callback');
 import {
   SchedulingBase,
   type SchedulerJob as BaseSchedulerJob,
 } from '@tryghost/adapter-base-scheduling';
+const {tenantCallback} = require('../../lib/gather/scheduler-callback');
 
 type SchedulerJob = BaseSchedulerJob & {
   tries?: number;

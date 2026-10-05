@@ -48,6 +48,13 @@ try {
   } else {
     await restoreTenantPrivileges(database, input.controlRole);
   }
+  // Existing cluster roles must authenticate with the projected private password;
+  // never silently rotate a role that may belong to another environment.
+  const control = require('knex')({...input.operatorDatabase, connection: {...input.operatorDatabase.connection, user: input.controlRole, password: input.controlPassword}, pool: {min: 0, max: 1}, acquireConnectionTimeout: 8000});
+  try {
+    const identity = await control.raw('SELECT current_user AS role');
+    if (identity.rows[0]?.role !== input.controlRole) throw new Error('Projected control identity does not authenticate');
+  } finally {await control.destroy();}
   for (const site of await database('gather_sites').whereIn('status', ['active', 'provisioning'])) {
     tenantRole(site.id);
     await database.raw('SELECT gather_ensure_runtime_role(?, ?)', [site.id, deriveTenantCredential(input.runtimeMasterKey, site.id)]);

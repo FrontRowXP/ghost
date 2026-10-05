@@ -31,13 +31,17 @@ test('97 shared tables enforce immutable login isolation, scoped uniqueness, rel
   assert.deepEqual([...TENANT_TABLES].sort(), Object.keys(schema).filter(name => !name.startsWith('gather_')).sort());
   const namespace = 'gather_isolation_' + randomBytes(6).toString('hex');
   const controlRole = 'gather_control_' + randomBytes(6).toString('hex');
+  const operatorRole = 'gather_operator_' + randomBytes(6).toString('hex');
   const ids = [randomUUID(), randomUUID()];
   const password = randomBytes(32).toString('hex');
-  const operator = knex({client: 'pg', connection: base, searchPath: [namespace], pool: {min: 0, max: 2}});
+  const administrator = knex({client: 'pg', connection: base, pool: {min: 0, max: 1}});
+  const operator = knex({client: 'pg', connection: {...base, user: operatorRole, password}, searchPath: [namespace], pool: {min: 0, max: 2}});
   let control;
   const runtimes = [];
   try {
-    await operator.raw('CREATE SCHEMA ??', [namespace]);
+    await administrator.raw(`CREATE ROLE ?? LOGIN NOINHERIT NOSUPERUSER NOCREATEDB CREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '${password}'`, [operatorRole]);
+    await administrator.raw('CREATE SCHEMA ?? AUTHORIZATION ??', [namespace, operatorRole]);
+    assert.equal((await operator.raw('SELECT rolsuper FROM pg_roles WHERE rolname=current_user')).rows[0].rolsuper, false);
     await operator.raw(`CREATE ROLE ?? LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '${password}'`, [controlRole]);
     // The migration owner creates canonical tables. Runtime users never run DDL.
     for (const name of Object.keys(schema)) await commands.createTable(name, operator);
@@ -146,9 +150,11 @@ test('97 shared tables enforce immutable login isolation, scoped uniqueness, rel
   } finally {
     await Promise.all(runtimes.map(runtime => runtime.destroy()));
     if (control) await control.destroy();
-    await operator.raw('DROP SCHEMA IF EXISTS ?? CASCADE', [namespace]);
-    for (const id of ids) await operator.raw('DROP ROLE IF EXISTS ??', [tenantRole(id)]);
-    await operator.raw('DROP ROLE IF EXISTS ??', [controlRole]);
     await operator.destroy();
+    await administrator.raw('DROP SCHEMA IF EXISTS ?? CASCADE', [namespace]);
+    for (const id of ids) await administrator.raw('DROP ROLE IF EXISTS ??', [tenantRole(id)]);
+    await administrator.raw('DROP ROLE IF EXISTS ??', [controlRole]);
+    await administrator.raw('DROP ROLE IF EXISTS ??', [operatorRole]);
+    await administrator.destroy();
   }
 });

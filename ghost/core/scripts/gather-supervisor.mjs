@@ -43,15 +43,17 @@ export async function startSupervisor(testOptions = {}) {
   const {SealedRedisStore} = require('../core/server/lib/gather/redis-store');
   const {createSiteHub} = require('../core/server/services/gather-sites/hub');
   const {createStaffLogin} = require('../core/server/lib/gather/staff-login');
-  const database = require('knex')({...settings.controlDatabase, pool: {min: 0, max: 4}, acquireConnectionTimeout: 8000});
+  const database = require('knex')({...settings.controlDatabase, connection: {...settings.controlDatabase.connection, statement_timeout: 10000}, pool: {min: 0, max: 4}, acquireConnectionTimeout: 8000});
   const client = require('cache-manager-ioredis').create({...settings.redis, connectTimeout: 5000, maxRetriesPerRequest: 1}).getClient();
   const directory = await mkdtemp(join(tmpdir(), 'gather-tenants-'));
   const workers = new Map();
   const starting = new Map();
   const reservedPorts = new Set();
   const challenges = new Map();
+  const retries = new Set();
   let server;
   let stopped = false;
+  let stopping;
   let leased = false;
   let leaseTimer;
   const prefix = `gather:{${settings.environment}-sites}`;
@@ -59,23 +61,35 @@ export async function startSupervisor(testOptions = {}) {
   const lease = randomBytes(32).toString('hex');
   const logFailure = (event, site) => console.error(JSON.stringify({event, siteId: site?.id || null}));
 
-  async function shutdown() {
-    if (stopped) return;
+  function shutdown(leaseLost = false) {
+    if (stopping) return stopping;
     stopped = true;
-    clearInterval(leaseTimer);
-    server?.close();
-    const children = [...workers.values()].map(worker => worker.child);
-    for (const child of children) child.kill('SIGTERM');
-    const deadline = Date.now() + 60000;
-    while (children.some(child => child.exitCode === null && child.signalCode === null) && Date.now() < deadline) await delay(200);
-    for (const child of children) if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
-    if (leased) await client.eval("if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0", 1, leaseKey, lease).catch(() => {});
-    client.disconnect();
-    await database.destroy();
-    await rm(directory, {recursive: true, force: true});
+    stopping = (async () => {
+      if (leaseLost) clearInterval(leaseTimer);
+      for (const timer of retries) clearTimeout(timer);
+      retries.clear();
+      server?.close();
+      const children = [...workers.values()].map(worker => worker.child);
+      for (const child of children) child.kill('SIGTERM');
+      const deadline = Date.now() + (leaseLost ? 5000 : 20000);
+      while (children.some(child => child.exitCode === null && child.signalCode === null) && Date.now() < deadline) await delay(200);
+      for (const child of children) if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+      await Promise.allSettled([...starting.values()]);
+      clearInterval(leaseTimer);
+      if (leased) await client.eval("if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0", 1, leaseKey, lease).catch(() => {});
+      client.disconnect();
+      await database.destroy();
+      await rm(directory, {recursive: true, force: true});
+    })();
+    return stopping;
   }
   process.once('SIGTERM', () => {void shutdown();});
   process.once('SIGINT', () => {void shutdown();});
+  function retry(callback, milliseconds) {
+    if (stopped) return;
+    const timer = setTimeout(() => {retries.delete(timer); if (!stopped) callback();}, milliseconds);
+    retries.add(timer);
+  }
   try {
     const identity = await database.raw('SELECT rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolinherit, rolreplication FROM pg_roles WHERE rolname=current_user');
     if (!identity.rows.length || Object.values(identity.rows[0]).some(Boolean)) throw new Error('Unsafe control database identity');
@@ -93,7 +107,7 @@ export async function startSupervisor(testOptions = {}) {
     leaseTimer = setInterval(() => {
       void client.eval("if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('PEXPIRE',KEYS[1],15000) end return 0", 1, leaseKey, lease)
         .then(value => {if (Number(value) !== 1) throw new Error('Lease lost');})
-        .catch(() => {logFailure('gather_supervisor_lease_lost'); void shutdown();});
+        .catch(() => {logFailure('gather_supervisor_lease_lost'); void shutdown(true);});
     }, 5000);
 
     async function start(site) {
@@ -119,6 +133,7 @@ export async function startSupervisor(testOptions = {}) {
         workerConfig.gather.tenant.hubCapability.creationEnabled = settings.creationEnabled === true;
         const filename = join(directory, site.id, 'config.production.json');
         await writeFile(filename, JSON.stringify(workerConfig), {mode: 0o600});
+        if (stopped) throw new Error('Supervisor stopped before worker launch');
         const child = fork(join(config.get('paths:appRoot'), 'index.js'), ['site-worker'], {
           cwd: config.get('paths:appRoot'), execArgv: ['--max-old-space-size=320'],
           env: {NODE_ENV: 'production', TZ: 'UTC', GATHER_REQUIRE_POSTGRES: 'true', GATHER_REQUIRE_ORIGIN: 'true', GATHER_SITE_CONFIG: filename},
@@ -130,7 +145,7 @@ export async function startSupervisor(testOptions = {}) {
         child.once('exit', () => {
           workers.delete(site.id);
           reservedPorts.delete(port);
-          if (!stopped) setTimeout(() => {
+          retry(() => {
             void database('gather_sites').where({id: site.id}).first().then(current => {
               if (current && ['active', 'provisioning'].includes(current.status)) queue(current);
             }).catch(() => logFailure('gather_tenant_restart_lookup_failed', site));
@@ -158,6 +173,7 @@ export async function startSupervisor(testOptions = {}) {
               if (response.status !== 200 || body !== challenge) throw new Error('Site HTTPS route is not verified');
             }
           } finally {challenges.delete(domain.hostname);}
+          if (stopped) throw new Error('Supervisor stopped during provisioning');
           await database.transaction(async tx => {
             await tx('gather_site_staff').insert({id: randomBytes(16).toString('hex'), site_id: site.id, subject_id: site.created_by, staff_id: ownerStaffId}).onConflict(['site_id', 'subject_id']).ignore();
             await tx('gather_site_domains').where({id: domain.id}).update({verified_at: new Date()});
@@ -166,11 +182,12 @@ export async function startSupervisor(testOptions = {}) {
           site.status = 'active';
         }
       })().catch(async () => {
+        if (stopped) return;
         logFailure('gather_tenant_start_failed', site);
         if (site.status === 'provisioning') {
           await database('gather_sites').where({id: site.id, status: 'provisioning'}).update({status: 'failed', updated_at: new Date()});
           workers.get(site.id)?.child.kill('SIGTERM');
-        } else if (!stopped) setTimeout(() => queue(site), 10000);
+        } else retry(() => queue(site), 10000);
       }).finally(() => {
         starting.delete(site.id);
         if (!workers.has(site.id) && allocatedPort) reservedPorts.delete(allocatedPort);

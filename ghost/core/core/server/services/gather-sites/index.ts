@@ -7,8 +7,12 @@ import { createSiteHub } from './hub';
 let hub: ReturnType<typeof createSiteHub> | undefined;
 let redis: { quit(): Promise<unknown>; disconnect(): void } | undefined;
 export async function init() {
-  if (hub) return;
-  if (config.get('gather:sites:enabled') !== true) return;
+  if (hub) {
+    return;
+  }
+  if (config.get('gather:sites:enabled') !== true) {
+    return;
+  }
   if (config.get('database:client') !== 'pg' || !config.get('security:frontroAuth:enabled')) {
     throw new errors.IncorrectUsageError({
       message: 'Gather site management requires PostgreSQL and Moments authentication',
@@ -16,8 +20,9 @@ export async function init() {
   }
   const urlUtils = require('../../../shared/url-utils').default;
   const origin = new URL(urlUtils.getAdminUrl() || urlUtils.getSiteUrl()).origin;
-  if (!origin.startsWith('https://'))
+  if (!origin.startsWith('https://')) {
     throw new errors.IncorrectUsageError({ message: 'Gather site management requires HTTPS' });
+  }
   const settings = config.get('gather:sites');
   if (!['staging', 'production'].includes(settings.environment) || !settings.redis?.host) {
     throw new errors.IncorrectUsageError({
@@ -26,10 +31,11 @@ export async function init() {
   }
   const database = require('../../data/db').knex;
   for (const name of ['gather_sites', 'gather_site_domains', 'gather_site_staff']) {
-    if (!(await database.schema.hasTable(name)))
+    if (!(await database.schema.hasTable(name))) {
       throw new errors.IncorrectUsageError({
         message: 'Gather site registry migration is missing',
       });
+    }
   }
   // Own this connection rather than reusing the global cache adapter's client.
   const redisStore = require('cache-manager-ioredis').create({
@@ -69,5 +75,7 @@ export async function shutdown() {
   hub = undefined;
   const connection = redis;
   redis = undefined;
-  if (connection) connection.disconnect();
+  if (connection) {
+    connection.disconnect();
+  }
 }

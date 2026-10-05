@@ -1,3 +1,4 @@
+const assert = require('node:assert/strict');
 const { agentProvider } = require('../../utils/e2e-framework');
 
 describe('Gather site management API capability boundary', function () {
@@ -7,10 +8,10 @@ describe('Gather site management API capability boundary', function () {
   });
   it('does not advertise a disabled site hub to existing or anonymous Admin', async function () {
     const response = await agent.get('site').expectStatus(200);
-    expect(response.body.site.gatherSites).toBeUndefined();
+    assert.equal(response.body.site.gatherSites, undefined);
     agent.clearCookies();
     const anonymous = await agent.get('site').expectStatus(200);
-    expect(anonymous.body.site.gatherSites).toBeUndefined();
+    assert.equal(anonymous.body.site.gatherSites, undefined);
   });
   it('denies anonymous site discovery and creation while the hub is disabled', async function () {
     agent.clearCookies();

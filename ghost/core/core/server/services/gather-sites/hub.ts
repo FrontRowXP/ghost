@@ -42,7 +42,7 @@ function verifiedPrincipal(value: any): Principal {
         !['owner', 'member'].includes(workspace.role),
     )
   ) {
-    throw new SitesError(503, 'identity_unavailable');
+    throw new SitesError({ statusCode: 503, code: 'identity_unavailable' });
   }
   return {
     user: { id: value.user.id, name: typeof value.user.name === 'string' ? value.user.name : '' },
@@ -88,12 +88,15 @@ export function createSiteHub({
       const old = tokenFrom(req);
       if (old) {
         const previous: HubSession | null = await sessions.consume(old);
-        if (previous) await auth.revoke(previous.delegation);
+        if (previous) {
+          await auth.revoke(previous.delegation);
+        }
       }
       const token = randomBytes(32).toString('hex');
       const expiresAt = now() + 6 * 60 * 60 * 1000;
-      if (!(await sessions.reserve(token, expiresAt)))
-        throw new SitesError(429, 'site_sessions_busy');
+      if (!(await sessions.reserve(token, expiresAt))) {
+        throw new SitesError({ statusCode: 429, code: 'site_sessions_busy' });
+      }
       try {
         await sessions.put(token, { delegation, csrf: randomBytes(32).toString('hex'), expiresAt });
         res.cookie(COOKIE, token, { ...cookieOptions, maxAge: expiresAt - now() });
@@ -104,13 +107,16 @@ export function createSiteHub({
     },
   });
   function sameOrigin(req: Request) {
-    if (req.get('origin') !== origin) throw new SitesError(403, 'origin_denied');
+    if (req.get('origin') !== origin) {
+      throw new SitesError({ statusCode: 403, code: 'origin_denied' });
+    }
   }
   async function current(req: Request) {
     const token = tokenFrom(req);
     const session: HubSession | null = token ? await sessions.get(token) : null;
-    if (!session || session.expiresAt <= now())
-      throw new SitesError(401, 'authentication_required');
+    if (!session || session.expiresAt <= now()) {
+      throw new SitesError({ statusCode: 401, code: 'authentication_required' });
+    }
     // Workspace removal/disabled identity is checked against Moments on
     // every request. Browser-provided account/workspace objects are ignored.
     const principal = verifiedPrincipal(await auth.identity(session.delegation));
@@ -123,7 +129,7 @@ export function createSiteHub({
       !TOKEN.test(supplied) ||
       !timingSafeEqual(Buffer.from(supplied), Buffer.from(session.csrf))
     ) {
-      throw new SitesError(403, 'csrf_invalid');
+      throw new SitesError({ statusCode: 403, code: 'csrf_invalid' });
     }
   }
   return {
@@ -154,7 +160,9 @@ export function createSiteHub({
         csrf(req, session);
         await sessions.delete(token);
         await auth.revoke(session.delegation);
-      } else sameOrigin(req);
+      } else {
+        sameOrigin(req);
+      }
       await auth.discard(req, res);
       res.clearCookie(COOKIE, cookieOptions);
       return res.sendStatus(204);

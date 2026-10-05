@@ -4,7 +4,9 @@ function handler(method) {
   return async function gatherSiteHandler(req, res) {
     res.set('Cache-Control', 'no-store');
     const hub = getHub();
-    if (!hub) return res.status(404).json({ code: 'site_management_unavailable' });
+    if (!hub) {
+      return res.status(404).json({ code: 'site_management_unavailable' });
+    }
     try {
       await hub[method](req, res);
     } catch (error) {

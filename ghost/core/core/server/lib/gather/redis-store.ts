@@ -34,8 +34,9 @@ export class SealedRedisStore {
     this.now = now;
   }
   private recordKey(token: string) {
-    if (!TOKEN.test(token))
+    if (!TOKEN.test(token)) {
       throw new errors.IncorrectUsageError({ message: 'Invalid session token' });
+    }
     return `${this.prefix}:record:${token}`;
   }
   private seal(token: string, value: unknown): string {
@@ -56,7 +57,9 @@ export class SealedRedisStore {
   }
   async reserve(token: string, expiresAt: number): Promise<boolean> {
     const ttl = expiresAt - this.now();
-    if (ttl <= 0) return false;
+    if (ttl <= 0) {
+      return false;
+    }
     const result = await this.redis.eval(
       `
             redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
@@ -80,7 +83,9 @@ export class SealedRedisStore {
   }
   async put(token: string, value: { expiresAt: number } & Record<string, unknown>) {
     const ttl = value.expiresAt - this.now();
-    if (ttl <= 0) throw new errors.IncorrectUsageError({ message: 'Expired session' });
+    if (ttl <= 0) {
+      throw new errors.IncorrectUsageError({ message: 'Expired session' });
+    }
     const updated = await this.redis.set(
       this.recordKey(token),
       this.seal(token, value),
@@ -88,7 +93,9 @@ export class SealedRedisStore {
       ttl,
       'XX',
     );
-    if (!updated) throw new errors.IncorrectUsageError({ message: 'Session reservation expired' });
+    if (!updated) {
+      throw new errors.IncorrectUsageError({ message: 'Session reservation expired' });
+    }
   }
   async get(token: string) {
     const record = await this.redis.get(this.recordKey(token));
@@ -109,6 +116,8 @@ export class SealedRedisStore {
     return typeof record === 'string' ? this.open(token, record) : null;
   }
   async delete(token: string | null) {
-    if (token) await this.consume(token);
+    if (token) {
+      await this.consume(token);
+    }
   }
 }

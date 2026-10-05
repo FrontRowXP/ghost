@@ -37,7 +37,9 @@ export function withSiteContext<T>(context: SiteContext, work: () => T): T {
 
 export function requireSiteContext(): Readonly<SiteContext> {
   const context = contexts.getStore();
-  if (!context) throw new errors.IncorrectUsageError({ message: 'Site context required' });
+  if (!context) {
+    throw new errors.IncorrectUsageError({ message: 'Site context required' });
+  }
   return context;
 }
 
@@ -48,8 +50,9 @@ export async function withSiteTransaction<T>(
   work: (tx: Knex.Transaction) => Promise<T>,
 ): Promise<T> {
   const context = requireSiteContext();
-  if (database.client.config.client !== 'pg')
+  if (database.client.config.client !== 'pg') {
     throw new errors.IncorrectUsageError({ message: 'Site isolation requires PostgreSQL' });
+  }
   return database.transaction(async (tx) => {
     const role = await tx.raw(
       'SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user',

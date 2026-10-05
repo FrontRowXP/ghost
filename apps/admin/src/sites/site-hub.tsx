@@ -21,25 +21,29 @@ type HubSession = {
 };
 type Site = { id: string; name: string; status: string; hostname?: string; verified_at?: string };
 function message(cause: unknown) {
-  if (cause instanceof SiteManagementError && cause.code === 'site_creation_unavailable')
+  if (cause instanceof SiteManagementError && cause.code === 'site_creation_unavailable') {
     return 'New sites are not available yet. You can continue editing your existing sites.';
-  if (cause instanceof SiteManagementError && cause.code === 'workspace_owner_required')
+  }
+  if (cause instanceof SiteManagementError && cause.code === 'workspace_owner_required') {
     return 'Only a workspace owner can create a site.';
-  if (cause instanceof SiteManagementError)
+  }
+  if (cause instanceof SiteManagementError) {
     return authMessage(new AuthError(cause.code, cause.status));
+  }
   return authMessage(cause);
 }
 
 export default function SiteHub() {
   const { data, isLoading } = useBrowseSite();
   const capability = data?.site.gatherSites;
-  if (isLoading)
+  if (isLoading) {
     return (
       <main className="gather-sites">
         <p role="status">Opening your sites…</p>
       </main>
     );
-  if (!capability)
+  }
+  if (!capability) {
     return (
       <main className="gather-sites">
         <img alt="Frontro" className="gather-sites-logo" src={logo} />
@@ -48,10 +52,19 @@ export default function SiteHub() {
         <a href="#/signin">Back to sign in</a>
       </main>
     );
-  return <SitesWorkspace apiOrigin={capability.apiOrigin} />;
+  }
+  return (
+    <SitesWorkspace apiOrigin={capability.apiOrigin} creationEnabled={capability.creationEnabled} />
+  );
 }
 
-function SitesWorkspace({ apiOrigin }: { apiOrigin: string }) {
+function SitesWorkspace({
+  apiOrigin,
+  creationEnabled,
+}: {
+  apiOrigin: string;
+  creationEnabled: boolean;
+}) {
   const [session, setSession] = useState<HubSession | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
   const [checking, setChecking] = useState(true);
@@ -76,7 +89,9 @@ function SitesWorkspace({ apiOrigin }: { apiOrigin: string }) {
     }
   }, []);
   const connect = useCallback(async () => {
-    if (connecting.current) return;
+    if (connecting.current) {
+      return;
+    }
     connecting.current = true;
     try {
       const identity = await authRequest<Session>(
@@ -116,14 +131,19 @@ function SitesWorkspace({ apiOrigin }: { apiOrigin: string }) {
             try {
               await connect();
             } catch (connectError) {
-              if (active && !(connectError instanceof AuthError && connectError.status === 401))
+              if (active && !(connectError instanceof AuthError && connectError.status === 401)) {
                 setError(message(connectError));
+              }
             }
           }
-        } else if (active) setError(message(cause));
+        } else if (active) {
+          setError(message(cause));
+        }
       })
       .finally(() => {
-        if (active) setChecking(false);
+        if (active) {
+          setChecking(false);
+        }
       });
     return () => {
       active = false;
@@ -132,7 +152,9 @@ function SitesWorkspace({ apiOrigin }: { apiOrigin: string }) {
   }, [load, connect]);
 
   async function signout() {
-    if (!session) return;
+    if (!session) {
+      return;
+    }
     try {
       await request('session/', undefined, session.csrfToken, 'DELETE');
       // The same API and explicit-signout intent as publication Admin.
@@ -156,7 +178,9 @@ function SitesWorkspace({ apiOrigin }: { apiOrigin: string }) {
   }
   async function create(event: React.FormEvent) {
     event.preventDefault();
-    if (!session?.creationEnabled || creating) return;
+    if (!session?.creationEnabled || creating) {
+      return;
+    }
     setCreating(true);
     setError('');
     try {
@@ -170,16 +194,17 @@ function SitesWorkspace({ apiOrigin }: { apiOrigin: string }) {
       setCreating(false);
     }
   }
-  if (mode && !session)
+  if (mode && !session) {
     return (
       <AuthModal
         apiOrigin={apiOrigin}
         initialMode={mode}
-        onAuthenticated={connect}
         oauthReturnTo={new URL('sites/', location.origin + location.pathname).href}
+        onAuthenticated={connect}
         onClose={() => setMode(null)}
       />
     );
+  }
 
   return (
     <main className="gather-sites">
@@ -198,13 +223,16 @@ function SitesWorkspace({ apiOrigin }: { apiOrigin: string }) {
           </PageHeader.Actions>
         </PageHeader>
       ) : (
-        <h1>Create your home for stories</h1>
+        <h1>{creationEnabled ? 'Create your home for stories' : 'Your Frontro sites'}</h1>
       )}
       <p>
         {session
           ? `Manage the sites in your Frontro workspaces, ${session.user.name || 'with your account'}.`
           : 'Publish with Frontro. Use the same account you use for Moments.'}
       </p>
+      {!session && !creationEnabled && (
+        <p role="status">New sites are not available yet. Sign in to manage your existing sites.</p>
+      )}
       {error && <p role="alert">{error}</p>}
       {checking ? (
         <p role="status">Opening your sites…</p>
@@ -255,12 +283,17 @@ function SitesWorkspace({ apiOrigin }: { apiOrigin: string }) {
                 New sites are not available yet. You can continue editing your existing sites.
               </p>
             )}
-            <form className="gather-site-form" onSubmit={(event) => { void create(event); }}>
+            <form
+              className="gather-site-form"
+              onSubmit={(event) => {
+                void create(event);
+              }}
+            >
               <Label htmlFor="site-workspace">Workspace</Label>
               <select
                 id="site-workspace"
-                required
                 value={workspace}
+                required
                 onChange={(event) => setWorkspace(event.target.value)}
               >
                 <option value="">Select a workspace</option>
@@ -276,20 +309,20 @@ function SitesWorkspace({ apiOrigin }: { apiOrigin: string }) {
               <Input
                 id="site-name"
                 maxLength={191}
-                required
-                value={name}
-                onChange={(event) => setName(event.target.value)}
                 placeholder="My publication"
+                value={name}
+                required
+                onChange={(event) => setName(event.target.value)}
               />
               <Label htmlFor="site-slug">Site address</Label>
               <Input
                 id="site-slug"
                 maxLength={63}
                 pattern="[a-z0-9]+(-[a-z0-9]+)*"
-                required
-                value={slug}
-                onChange={(event) => setSlug(event.target.value.toLowerCase())}
                 placeholder="my-publication"
+                value={slug}
+                required
+                onChange={(event) => setSlug(event.target.value.toLowerCase())}
               />
               <Button disabled={!session.creationEnabled || !workspace || creating} type="submit">
                 {creating ? 'Creating your site…' : 'Create site'}

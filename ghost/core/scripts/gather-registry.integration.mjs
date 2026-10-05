@@ -88,23 +88,41 @@ test('PostgreSQL registry migrates, rolls back and respects membership, staff an
     const config = require('../core/shared/config');
     const db = require('../core/server/data/db');
     const descriptor = Object.getOwnPropertyDescriptor(db, 'knex');
-    const settings = ['database:client', 'url', 'admin:url', 'gather:sites', 'security:frontroAuth'];
-    const prior = settings.map(key => [key, config.get(key)]);
+    const settings = [
+      'database:client',
+      'url',
+      'admin:url',
+      'gather:sites',
+      'security:frontroAuth',
+    ];
+    const prior = settings.map((key) => [key, config.get(key)]);
     const service = require('../core/server/services/gather-sites');
     try {
-        Object.defineProperty(db, 'knex', {configurable: true, get: () => database});
-        config.set('database:client', 'pg');
-        config.set('url', 'https://gather.example.test');
-        config.set('admin:url', 'https://gather.example.test');
-        config.set('security:frontroAuth', {enabled: true, apiOrigin: 'https://moments.example.test'});
-        config.set('gather:sites', {enabled: true, environment: 'staging', sessionSealingKey: 'a'.repeat(64), redis: {host: '127.0.0.1', port: 6379}});
-        await service.init();
-        assert.deepEqual(service.getHub().capability, {apiOrigin: 'https://moments.example.test', creationEnabled: false, version: 1});
-        await service.init(); // Boot init is idempotent.
+      Object.defineProperty(db, 'knex', { configurable: true, get: () => database });
+      config.set('database:client', 'pg');
+      config.set('url', 'https://gather.example.test');
+      config.set('admin:url', 'https://gather.example.test');
+      config.set('security:frontroAuth', {
+        enabled: true,
+        apiOrigin: 'https://moments.example.test',
+      });
+      config.set('gather:sites', {
+        enabled: true,
+        environment: 'staging',
+        sessionSealingKey: 'a'.repeat(64),
+        redis: { host: '127.0.0.1', port: 6379 },
+      });
+      await service.init();
+      assert.deepEqual(service.getHub().capability, {
+        apiOrigin: 'https://moments.example.test',
+        creationEnabled: false,
+        version: 1,
+      });
+      await service.init(); // Boot init is idempotent.
     } finally {
-        await service.shutdown();
-        Object.defineProperty(db, 'knex', descriptor);
-        for (const [key, value] of prior) config.set(key, value);
+      await service.shutdown();
+      Object.defineProperty(db, 'knex', descriptor);
+      for (const [key, value] of prior) config.set(key, value);
     }
     await migration.down({ connection: database });
     for (const name of ['gather_sites', 'gather_site_domains', 'gather_site_staff'])

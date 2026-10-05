@@ -98,7 +98,9 @@ try {
         const downloaded = await client.send(new GetObjectCommand({Bucket: backup.bucket, Key: name}));
         const hash = createHash('sha256'); await pipeline(downloaded.Body, hash);
         const local = createHash('sha256'); await pipeline(createReadStream(cipher), local);
-        if (hash.digest('hex') !== local.digest('hex')) throw new Error('NAS backup verification failed');
+        const sha256 = local.digest('hex');
+        if (hash.digest('hex') !== sha256) throw new Error('NAS backup verification failed');
+        await writeFile(join(config.backupDirectory, 'backup-attestation.json'), JSON.stringify({file: cipher, sha256, bytes: size, database: db.database, verifiedAt: new Date().toISOString()}), {mode: 0o600});
         console.log('Encrypted production backup verified on NAS; protected second copy retained.', name);
     } finally {await rm(tar, {force: true});}
 } finally {if (snapshot) await snapshot.end(); await rm(work, {recursive: true, force: true}); client.destroy();}

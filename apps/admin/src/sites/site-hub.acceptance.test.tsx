@@ -11,7 +11,7 @@ import {
 
 const apiOrigin = 'https://api.moments.frontro.com';
 const workspace = '11111111-1111-4111-8111-111111111111';
-function boot(enabled = true) {
+function boot(enabled = true, creationEnabled = false) {
   const options = signedOut({ authReact: true });
   return {
     ...options,
@@ -22,7 +22,7 @@ function boot(enabled = true) {
           site: {
             ...siteResponse().site,
             authReact: true,
-            ...(enabled ? { gatherSites: { apiOrigin, creationEnabled: false, version: 1 } } : {}),
+            ...(enabled ? { gatherSites: { apiOrigin, creationEnabled, version: 1 } } : {}),
           },
         },
       },
@@ -37,6 +37,41 @@ beforeEach(() => {
     phone: true,
     social: ['google'],
   });
+});
+
+it('lets a workspace owner create a site and shows preparing status until the server verifies its domain', async () => {
+  fakeAdminEndpoint('GET', '/gather/session/', {
+    user: {id: workspace, name: 'Ben'}, workspaces: [{id: workspace, name: 'Frontro', role: 'owner'}],
+    csrfToken: 'a'.repeat(64), creationEnabled: true,
+  });
+  const prepared = {id: workspace, name: 'New publication', hostname: 'new.gather.example.test', status: 'provisioning'};
+  let sites: typeof prepared[] = [];
+  fakeAdminEndpoint('GET', '/gather/sites/', () => ({sites}));
+  const create = fakeAdminEndpoint('POST', '/gather/sites/', () => {sites = [prepared]; return {site: prepared};}, {status: 201});
+  await renderAdminApp('/sites', boot(true, true));
+  await page.getByLabelText('Site name').fill('New publication');
+  await page.getByLabelText('Site address').fill('new');
+  await page.getByRole('button', {name: 'Create site', exact: true}).click();
+  await expect.element(page.getByText('Preparing your site')).toBeVisible();
+  expect(create.lastRequest?.body).toEqual({workspaceId: workspace, name: 'New publication', slug: 'new'});
+  expect(create.requests).toHaveLength(1);
+  await expect.element(page.getByRole('link', {name: 'Edit site'})).not.toBeInTheDocument();
+});
+
+it('shows a site-address conflict without retrying the creation write', async () => {
+  fakeAdminEndpoint('GET', '/gather/session/', {
+    user: {id: workspace, name: 'Ben'}, workspaces: [{id: workspace, name: 'Frontro', role: 'owner'}],
+    csrfToken: 'a'.repeat(64), creationEnabled: true,
+  });
+  fakeAdminEndpoint('GET', '/gather/sites/', {sites: []});
+  const create = fakeAdminEndpoint('POST', '/gather/sites/', {code: 'site_address_in_use'}, {status: 409});
+  await renderAdminApp('/sites', boot(true, true));
+  await page.getByLabelText('Site name').fill('Publication');
+  await page.getByLabelText('Site address').fill('taken');
+  await page.getByRole('button', {name: 'Create site', exact: true}).click();
+  await expect.element(page.getByRole('alert')).toHaveTextContent('This site address is already in use. Choose another address.');
+  expect(create.requests).toHaveLength(1);
+  await expect.element(page.getByLabelText('Site address')).toHaveValue('taken');
 });
 it('handles an older backend without starting a signup or provisioning request', async () => {
   await renderAdminApp('/sites', boot(false));

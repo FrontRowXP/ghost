@@ -35,6 +35,8 @@
     "scripts/gather-ready.mjs",
     "scripts/gather-supervisor.mjs",
     "scripts/gather-worker-config.mjs",
+    "scripts/gather-operator.mjs",
+    "scripts/gather-http.mjs",
     "types/",
     "index.js",
     "loggingrc.js",

@@ -7,6 +7,7 @@ import {join} from 'node:path';
 import {tmpdir, totalmem} from 'node:os';
 import {setTimeout as delay} from 'node:timers/promises';
 import {deriveTenantCredential, workerConfiguration} from './gather-worker-config.mjs';
+import {loopbackRequest} from './gather-http.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -29,6 +30,8 @@ export async function startSupervisor(testOptions = {}) {
     !settings.redis?.host || settings.controlDatabase?.client !== 'pg' || !['staging', 'production'].includes(settings.environment)) {
     throw new Error('Shared tenancy requires a fully projected, bounded configuration');
   }
+  if (template.database?.client !== 'pg' || template.database.connection?.user !== settings.controlDatabase.connection?.user || template.database.connection?.password !== settings.controlDatabase.connection?.password) throw new Error('The supervisor configuration must contain only the constrained control database identity');
+  if (settings.hostnameDomain !== new URL(origin).hostname || typeof settings.hostnamePrefix !== 'string' || !/^[a-z0-9-]{0,20}$/.test(settings.hostnamePrefix)) throw new Error('Each tenancy environment requires its own hub DNS zone');
   let availableMemory = totalmem();
   for (const filename of ['/sys/fs/cgroup/memory.max', '/sys/fs/cgroup/memory/memory.limit_in_bytes']) {
     const value = await readFile(filename, 'utf8').catch(() => null);
@@ -136,7 +139,7 @@ export async function startSupervisor(testOptions = {}) {
         const deadline = Date.now() + 180000;
         while (!stopped && Date.now() < deadline && child.exitCode === null && child.signalCode === null) {
           try {
-            const response = await fetch(`http://127.0.0.1:${port}/ghost/api/admin/site/`, {headers: {Host: domain.hostname, 'X-Forwarded-Proto': 'https', 'X-Gather-Origin-Key': originSecret}, signal: AbortSignal.timeout(3000)});
+            const response = await loopbackRequest(port, '/ghost/api/admin/site/', {headers: {Host: domain.hostname, 'X-Forwarded-Proto': 'https', 'X-Gather-Origin-Key': originSecret}, signal: AbortSignal.timeout(3000)});
             await response.body?.cancel();
             if (response.status === 200 && worker.bootReady) {worker.ready = true; break;}
           } catch { /* Boot remains bounded by the deadline. */ }
@@ -209,7 +212,7 @@ export async function startSupervisor(testOptions = {}) {
         if (req.path === '/ghost/_gather/signin/start/' && req.method === 'GET') return await staffLogin.start(req, res, site.id, host);
         if (req.path === '/ghost/_gather/signin/complete/' && req.method === 'GET') {
           const delegation = await staffLogin.consume(req, host, site.id);
-          const response = await fetch(`http://127.0.0.1:${worker.port}/ghost/api/admin/authentication/gather/delegation/`, {
+          const response = await loopbackRequest(worker.port, '/ghost/api/admin/authentication/gather/delegation/', {
             method: 'POST', headers: {Host: host, Origin: 'https://' + host, 'X-Forwarded-Proto': 'https', 'X-Gather-Origin-Key': originSecret, 'X-Gather-Worker-Key': worker.bridgeSecret, 'Content-Type': 'application/json'}, body: JSON.stringify(delegation), signal: AbortSignal.timeout(15000), redirect: 'error',
           });
           await response.body?.cancel();

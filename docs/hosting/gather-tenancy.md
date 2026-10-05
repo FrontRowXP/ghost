@@ -1,83 +1,135 @@
-# Gather tenancy rollout
+# Gather shared tenancy
 
-The first implementation introduces a control-plane registry and a site hub.
-It does **not** make the existing publication runtime multi-tenant. Core still
-has process-wide settings, routing, models, sessions, jobs and service instances.
-Creating a second publication remains disabled in both the API and UI.
+The shared runtime keeps the existing PostgreSQL database, 97 publication tables,
+Redis, private S3 bucket and Kubernetes deployments. Each publication has `site_id`
+and a bounded child process inside the existing shared Core deployment. No new
+database, schema, pod or volume is created for a publication.
 
-## Implemented boundary
+Source implementation and CI qualification are separate from commissioning.
+Keep creation and production promotion disabled until real domain, NAS, owner
+authentication and encrypted recovery acceptance pass. See [Gather hosting](gather.md).
 
-- The existing PostgreSQL database holds `gather_sites`, `gather_site_domains`
-  and `gather_site_staff`. There is no database provisioned per site.
-- Moments remains the authority for accounts and workspace membership. The hub
-  rechecks `/v1/me` on every authenticated request and requires an explicit staff
-  link before listing a publication. Workspace membership alone grants no Admin
-  access. The existing Ghost staff session remains separate.
-- Shared Redis stores bounded, encrypted hub sessions and one-use handoffs.
-  Environment namespaces keep staging and production separate. Ciphertexts are
-  bound to their record key, so copying one cannot change its browser binding.
-- The hub is at `/ghost/#/sites`. It uses the existing Moments modal for signup
-  and login, and shows a workspace selector, site list and disabled creation form.
-  Its public capability is advertised only after successful opt-in initialization.
-- Publication JSON exports exclude all platform registry records, including an
-  explicit request to include them. Encrypted operator database backups retain
-  the complete database as documented in [Gather hosting](gather.md).
+## Boundaries
 
-## Opt-in requirements
+- PostgreSQL derives site identity from an immutable `gather_site_<UUID hex>`
+  LOGIN, never a browser value or configurable connection variable. All 97 tables
+  have forced RLS. Semantic uniqueness and foreign keys include `site_id`; views
+  use invoker security. Runtime roles cannot own tables, assume roles, bypass
+  RLS, create objects, truncate or modify platform staff grants. Startup audits
+  actual role flags, memberships, policies, views and schema privileges.
+- The constrained control role manages the registry and reads the staff roster.
+  A constrained security-definer function issues fixed runtime roles. Migration
+  credentials belong only to the offline operator. Both database fields in the
+  supervisor configuration must use the control identity.
+- Fixed workers contain independent models, settings, routes, themes, services,
+  sessions and schedulers. Redis keys and S3 routes, redirects, images, media and
+  files are namespaced. Existing content retains `content/`; new sites use
+  `sites/<UUID>/content/`. Publication exports omit site IDs and platform records.
+- Separate origins isolate tenant custom JavaScript. Staging uses
+  `<slug>.gather-stage.frontro.com`; production uses `<slug>.gather.frontro.com`.
+  Each zone needs DNS, CDN hostname preservation and origin authentication, and
+  matching wildcard origin TLS. Unknown/unverified hosts never resolve to a site.
+- Moments signup/login stays on the trusted hub at `/ghost/#/sites`, using the
+  same modal and API. Credentialed Moments CORS remains restricted to reviewed
+  hub origins. A browser-, hostname- and site-bound one-use grant opens a site's
+  host-only staff session. Access requires fresh workspace membership, an
+  explicit immutable subject binding and an active local staff account.
+- Workspace owners can reserve a name/address. Provisioning is durable,
+  idempotent for the same owner/workspace/name/address, and capacity bounded.
+  Staff access is granted after boot and a real edge HTTPS nonce challenge.
+  Failed setup is visible and retryable with the same details; preparing sites
+  expose no early Edit link. A Redis supervisor lease and parent-death IPC prevent
+  duplicate pools. Restart rebuilds each site's signed schedules. Internal
+  callbacks retain the canonical token audience and address their own worker.
+- The two-GiB Core budget supports two sites. Increasing the limit up to eight
+  requires reviewed memory resources. Startup rejects insufficient container
+  capacity. No per-site infrastructure provisioning is exposed through HTTP.
 
-Keep `gather.sites.enabled` false until PostgreSQL migration, external Redis and
-real hub authentication have passed staging acceptance. The private runtime
-configuration requires:
+## Offline installation
+
+1. Qualify the exact source/image and commission each tenant DNS/CDN/TLS zone.
+2. Drain all application database connections. Create and verify an encrypted
+   database/NAS backup with the existing operator lane; retain its protected
+   second copy and private `backup-attestation.json`.
+3. Project a private operator JSON configuration with `operatorDatabase` (Knex
+   PostgreSQL configuration for the migration owner), `controlRole`,
+   `controlPassword`, `runtimeMasterKey`, `backupAttestationPath` and `enrollment`.
+   Enrollment contains stable `siteId`, `workspaceId`, `subjectId`, `staffId`,
+   `name` and existing verified `hostname`. Staff must be the existing active
+   Owner and match the previously configured Moments subject binding. The
+   command rechecks a current stored Moments session and owned workspace;
+   email matching never grants access. Keys/passwords are random 32-byte hex;
+   never commit or print them.
+4. In the shipped Core directory, run
+   `node scripts/gather-operator.mjs --mode install --config /private/operator.json`.
+   It checks quiescence and the retained NAS-verified backup, runs canonical
+   migrations once, registers the verified publication, installs transactional
+   isolation and issues fixed runtime credentials.
+5. Project the shared supervisor configuration through the existing private
+   credential path. Root `database` and `controlDatabase` must both contain the
+   same constrained control connection, never the migration identity.
 
 ```json
 {
   "gather": {
-    "sites": {
+    "sharedTenancy": {
       "enabled": true,
+      "creationEnabled": false,
       "environment": "staging",
-      "redis": {"host": "EXTERNAL_REDIS_HOST", "port": 6379},
-      "sessionSealingKey": "PROJECTED_32_BYTE_HEX_KEY"
+      "maximumSites": 2,
+      "hostnamePrefix": "",
+      "hostnameDomain": "gather-stage.frontro.com",
+      "runtimeMasterKey": "PROJECTED_RANDOM_32_BYTE_HEX_KEY",
+      "sessionSealingKey": "SEPARATE_PROJECTED_RANDOM_32_BYTE_HEX_KEY",
+      "redis": {"host": "EXISTING_EXTERNAL_REDIS", "port": 6379},
+      "controlDatabase": {"client": "pg", "connection": "PRIVATE_KNEX_CONNECTION_OBJECT"}
     }
   }
 }
 ```
 
-Project a cryptographically random 32-byte key as 64 lowercase hex characters;
-the placeholder above intentionally fails validation. Project Redis credentials
-and TLS options through the same private configuration. Production needs its
-own key and namespace. Rotating the sealing key invalidates hub sessions.
-The server also requires PostgreSQL, HTTPS and enabled Moments staff auth.
+Placeholders intentionally fail validation. Preserve reviewed Redis credentials,
+TLS, private S3 adapters, HTTPS URLs, Moments API and origin credential. Staging
+and production require distinct keys, database/environment namespaces and DNS
+zones while reusing the existing database infrastructure service.
 
-`SiteRegistry.registerExistingSite` is an operator-only bootstrap boundary,
-not a public endpoint. Supply the verified immutable Moments subject, an owned
-Moments workspace, an active local Ghost Owner, a stable site UUID and the
-verified domain. Never choose a workspace from a browser-provided value or
-auto-grant access by matching an email address. The first existing publication
-uses the reserved `gather` slug. This method has not been applied to staging or
-production as part of this source change.
+Render with `infra/kubernetes/render.py --shared-tenancy --tenant-domain` equal to
+the hub hostname and reviewed `--maximum-sites`. The runtime command is
+`node index.js shared-tenancy`. Workers receive whitelisted private configurations,
+non-owner roles and no migration capability. Enable `creationEnabled` only after
+real two-site acceptance succeeds.
 
-## Remaining implementation gates
+## Recovery
 
-1. Inventory every publishing table, add `site_id`, backfill the existing site,
-   and convert unique indexes and relationships to preserve site boundaries.
-   Use a separate migration role and a non-owner runtime role without RLS bypass.
-   Install and force PostgreSQL row security on the complete inventory.
-2. Route all Bookshelf, raw Knex and service queries through a scoped transaction.
-   The new context helper refuses to operate on unisolated publishing tables;
-   it is not yet connected to the legacy query layer.
-3. Replace global settings, routes, theme configuration and service instances with
-   bounded tenant runtime objects. Resolve only verified registry domains through
-   the trusted edge. Cover anonymous rendering as well as authenticated Admin.
-4. Add tenant identity to every job, email, webhook, search index, cache key and
-   scheduler lease. Enforce quotas and verify retry/restart behavior for two sites.
-5. Namespace and authorize NAS objects, routes, redirects and CDN invalidation by
-   site. Qualify upload, byte-range reads, private assets and deletion boundaries.
-6. Implement idempotent provisioning and rollback, then test two independent
-   owners publishing concurrently, switching sites, revocation, rescheduling,
-   backup/restore and deletion. Remove creation blockers only after this passes.
+Operator backups include both object prefixes, one exported PostgreSQL snapshot,
+the isolation manifest, original migration/control identities, site IDs and table
+counts. Database privileges are deliberately excluded; credentials stay private.
 
-CI exercises PostgreSQL registry upgrade/rollback, shared Redis concurrency,
-context isolation, export exclusion, disabled API behavior, signup UI and older
-backend compatibility. Its fixtures do not certify real multi-tenant publishing.
-Production promotion retains the existing NAS, backup and staging acceptance
-requirements in [Gather hosting](gather.md).
+Restore into an isolated non-public recovery database as the original migration
+owner. Create the original constrained control role before restoring because RLS
+policies refer to it. Restore the decrypted snapshot with the matching PostgreSQL
+client, preserving all policies/functions/data. Validate manifest, counts and
+object hashes. Before exposing runtimes, run
+`node scripts/gather-operator.mjs --mode restore-grants --config /private/operator.json`.
+It revokes public role-issuer access, restores audited control ACLs and reissues
+fixed worker privileges/passwords. Startup independently checks isolation.
+Runtime/sealing key rotation safely invalidates browser sessions.
+
+Registry/column rollback refuses to remove installed boundaries. Image rollback
+does not undo this database transformation: retain a qualified shared-runtime
+image or follow an explicit isolated restore procedure.
+
+## Commissioning evidence
+
+CI includes non-owner isolation across every table, scoped uniqueness/references,
+staff-grant/role denial, policy tampering, actual two-process publishing, independent
+uploads, restart, overdue schedules, pg_dump/pg_restore and restored privileges.
+Browser acceptance includes signup, enabled creation, preparing state, address
+conflicts and older backend compatibility. Disposable HTTP/S3 fixtures do not
+certify real NAS or TLS.
+
+Real staging acceptance must also prove independent owner login/revocation,
+public HTTPS rendering, NAS multipart uploads/range reads/deletion, encrypted
+asset/database recovery and provisioning failure/retry. Keep production disabled
+on any failed boundary. The current NAS multipart UploadPart timeout and abort
+503 require infrastructure repair; a successful health read is insufficient.

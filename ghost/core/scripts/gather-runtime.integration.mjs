@@ -13,6 +13,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {startSupervisor} from './gather-supervisor.mjs';
 import {deriveTenantCredential} from './gather-worker-config.mjs';
+import {loopbackRequest} from './gather-http.mjs';
 const require = createRequire(import.meta.url);
 const exec = promisify(execFile);
 
@@ -77,7 +78,7 @@ test('two actual fixed-role publication processes publish independently and reco
     const registry = new SiteRegistry(operator);
     await registry.registerExistingSite({siteId: ids[0], workspaceId: workspace, subjectId: subject, staffId: owner.id, name: 'Existing', hostname: 'gather.example.test'});
     await operator('gather_sites').insert({id: ids[1], workspace_id: workspace, created_by: subject, name: 'Independent', slug: 'independent', status: 'provisioning', created_at: new Date(), updated_at: new Date()});
-    await operator('gather_site_domains').insert({id: randomUUID(), site_id: ids[1], hostname: 'gather-independent.example.test', is_primary: true});
+    await operator('gather_site_domains').insert({id: randomUUID(), site_id: ids[1], hostname: 'independent.gather.example.test', is_primary: true});
     const {installTenantIsolation, restoreTenantPrivileges, verifyTenantDatabase, TENANT_TABLES, tenantRole} = require('../core/server/lib/gather/database');
     await installTenantIsolation(operator, ids[0], controlRole);
     await new Promise(resolve => s3.server.listen(0, '127.0.0.1', resolve));
@@ -87,11 +88,12 @@ test('two actual fixed-role publication processes publish independently and reco
     config.set('storage', {active: 'S3Storage', S3Storage: {...storage, cdnUrl: 'https://gather.example.test/_assets', staticFileURLPrefix: 'content/images'}, media: {...storage, adapter: 'S3Storage', cdnUrl: 'https://gather.example.test/_assets', staticFileURLPrefix: 'content/media'}, files: {...storage, adapter: 'S3Storage', cdnUrl: 'https://gather.example.test/_assets', staticFileURLPrefix: 'content/files'}});
     config.set('adapters', {...config.get('adapters'), cache: {active: 'MemoryCache', settings: {adapter: 'MemoryCache'}}, 'route-settings': {active: 'S3RouteSettingsStore', S3RouteSettingsStore: {...storage, staticFileURLPrefix: 'content/settings', defaultSettingsBasePath: resolve('core/server/services/route-settings')}}, redirects: {active: 'S3RedirectsStore', S3RedirectsStore: {...storage, staticFileURLPrefix: 'content/settings'}}});
     config.set('server', {host: '127.0.0.1', port: 2368});
-    config.set('gather', {sharedTenancy: {enabled: true, creationEnabled: true, environment: 'staging', maximumSites: 2, hostnamePrefix: 'gather-', hostnameDomain: 'example.test', runtimeMasterKey: master, sessionSealingKey: 'b'.repeat(64), redis: {host: '127.0.0.1', port: 6379}, controlDatabase: {client: 'pg', connection: {...connection, user: controlRole, password: controlPassword}}}});
-    const request = async (host, path, options = {}) => fetch('http://127.0.0.1:2368' + path, {...options, headers: {Host: host, Origin: 'https://' + host, 'X-Gather-Origin-Key': 'a'.repeat(64), ...options.headers}, signal: AbortSignal.timeout(10000), redirect: 'manual'});
+    config.set('gather', {sharedTenancy: {enabled: true, creationEnabled: true, environment: 'staging', maximumSites: 2, hostnamePrefix: '', hostnameDomain: 'gather.example.test', runtimeMasterKey: master, sessionSealingKey: 'b'.repeat(64), redis: {host: '127.0.0.1', port: 6379}, controlDatabase: {client: 'pg', connection: {...connection, user: controlRole, password: controlPassword}}}});
+    config.set('database', {client: 'pg', connection: {...connection, user: controlRole, password: controlPassword}});
+    const request = async (host, path, options = {}) => loopbackRequest(2368, path, {...options, headers: {Host: host, Origin: 'https://' + host, 'X-Gather-Origin-Key': 'a'.repeat(64), ...options.headers}, signal: AbortSignal.timeout(10000), redirect: 'manual'});
     const start = () => startSupervisor({verifyDomain: async (host, challenge) => {const response = await request(host, '/_gather/domain/' + challenge); assert.equal(response.status, 200); assert.equal(await response.text(), challenge);}});
     supervisor = await start();
-    const hosts = ['gather.example.test', 'gather-independent.example.test'];
+    const hosts = ['gather.example.test', 'independent.gather.example.test'];
     const tokens = [];
     for (const [i, id] of ids.entries()) {
       const database = knex({client: 'pg', connection: {...connection, user: tenantRole(id), password: deriveTenantCredential(master, id)}, pool: {min: 0, max: 2}});

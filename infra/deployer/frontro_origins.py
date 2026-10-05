@@ -25,6 +25,7 @@ def patch(deployment, origins):
     spec = deployment['spec']
     status = deployment['status']
     if (status.get('observedGeneration') != deployment['metadata']['generation']
+            or status.get('replicas') != spec['replicas']
             or status.get('updatedReplicas') != spec['replicas']
             or status.get('availableReplicas', 0) < spec['replicas']):
         raise RuntimeError('An API rollout is already in progress; wait before changing configuration')

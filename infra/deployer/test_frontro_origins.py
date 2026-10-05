@@ -6,7 +6,7 @@ class OriginTests(unittest.TestCase):
     def fixture(self):
         return {'metadata': {'resourceVersion': '17', 'generation': 2},
                 'spec': {'replicas': 2, 'template': {'spec': {'containers': [{'name': 'api', 'command': EXPECTED[:] }]}}},
-                'status': {'observedGeneration': 2, 'updatedReplicas': 2, 'availableReplicas': 2}}
+                'status': {'observedGeneration': 2, 'replicas': 2, 'updatedReplicas': 2, 'availableReplicas': 2}}
     def test_preserves_credential_launcher_and_only_patches_command(self):
         d = self.fixture(); original = copy.deepcopy(d)
         operations = patch(d, ['https://gather.frontro.com'])
@@ -16,6 +16,8 @@ class OriginTests(unittest.TestCase):
         self.assertEqual(operations[0]['op'], 'test')
     def test_refuses_overlapping_rollout_or_unrecognized_launcher(self):
         d = self.fixture(); d['status']['updatedReplicas'] = 1
+        with self.assertRaises(RuntimeError): patch(d, ['https://gather.frontro.com'])
+        d = self.fixture(); d['status']['replicas'] = 3
         with self.assertRaises(RuntimeError): patch(d, ['https://gather.frontro.com'])
         d = self.fixture(); d['spec']['template']['spec']['containers'][0]['command'] = ['other']
         with self.assertRaises(RuntimeError): patch(d, ['https://gather.frontro.com'])

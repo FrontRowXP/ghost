@@ -76,7 +76,7 @@ def promote(config, root, sha, state):
     run(['git', 'submodule', 'update', '--init', '--recursive'], cwd=checkout)
     env = os.environ.copy()
     env.update({'PATH': config['node_bin']+':'+env['PATH'], 'COREPACK_HOME': str(root/'cache/corepack'),
-        'XDG_CACHE_HOME': str(root/'cache'), 'npm_config_store_dir': str(root/'cache/pnpm-store'), 'TMPDIR': str(root/'tmp'),
+        'XDG_CACHE_HOME': str(root/'cache'), 'XDG_CONFIG_HOME': str(root/'cache/config'), 'npm_config_store_dir': str(root/'cache/pnpm-store'), 'TMPDIR': str(root/'tmp'),
         'GNUPGHOME': str(root/'gpg'), 'NX_DAEMON': 'false', 'NX_NATIVE_COMMAND_RUNNER': 'false', 'NX_PARALLEL': '2'})
     (root/'tmp').mkdir(exist_ok=True)
     (root/'gpg').mkdir(mode=0o700, exist_ok=True)

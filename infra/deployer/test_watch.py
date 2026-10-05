@@ -26,10 +26,12 @@ class QualificationGate(unittest.TestCase):
                 'production': {'namespace': 'fixture-production'}, 'production_enabled': True}
             previous = 'fixture@sha256:'+OLD[:32]*2
             calls = []
+            build_environments = []
             failed = False
             def operation(args, **kwargs):
                 nonlocal failed
                 calls.append(args)
+                if args[0] == 'pnpm': build_environments.append(kwargs['env'])
                 if 'get' in args and 'deployment/gather' in args:
                     return previous
                 if 'rollout' in args and 'fixture-stage' in args and not failed:
@@ -39,6 +41,9 @@ class QualificationGate(unittest.TestCase):
             with patch.object(watch, 'run', side_effect=operation):
                 with self.assertRaisesRegex(RuntimeError, 'staging image unreadable'):
                     watch.promote(config, root, SHA, {})
+            self.assertTrue(build_environments)
+            for env in build_environments:
+                self.assertEqual(env['XDG_CONFIG_HOME'], str(root/'cache/config'))
             updates = [args for args in calls if 'set' in args and 'image' in args]
             self.assertTrue(any('gather='+previous in args for args in updates))
             self.assertTrue(any('gather-assets='+previous in args for args in updates))

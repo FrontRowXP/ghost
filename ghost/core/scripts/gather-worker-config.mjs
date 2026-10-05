@@ -48,5 +48,6 @@ export function workerConfiguration({template, site, hostname, legacySiteId, own
   // owner configures them. Publication, search and editing are available.
   config.members = {...config.members, paymentProcessors: []};
   config.sodoSearch = {url: config.url + '/public/gather-search/sodo-search.min.js', styles: config.url + '/public/gather-search/main.css'};
+  config.explore = {update_url: null, testimonials_url: null};
   return config;
 }

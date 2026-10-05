@@ -17,8 +17,9 @@ module.exports = function apiRoutes() {
 
   router.use(apiMw.cors);
   if (require('../../../../../shared/config').get('gather:tenant:siteId')) {
+    const {nativeAuthUnavailable} = require('../../../../../server/lib/gather/native-auth');
     router.use((req, res, next) => {
-      if (req.method === 'POST' && req.path === '/session' || req.path.startsWith('/authentication/password_reset') || req.path.startsWith('/authentication/setup')) return res.sendStatus(404);
+      if (nativeAuthUnavailable(req.method, req.path)) return res.sendStatus(404);
       next();
     });
   }

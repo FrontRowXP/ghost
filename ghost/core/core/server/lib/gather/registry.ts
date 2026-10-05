@@ -168,9 +168,11 @@ export class SiteRegistry {
         throw new SitesError({ statusCode: 403, code: 'existing_owner_required' });
       }
       const existing = await tx('gather_sites').where({ id: input.siteId }).first();
-      if (existing && existing.workspace_id !== input.workspaceId) {
+      if (existing && (existing.workspace_id !== input.workspaceId || existing.created_by !== input.subjectId || existing.slug !== 'gather' || existing.status !== 'active')) {
         throw new SitesError({ statusCode: 409, code: 'site_binding_conflict' });
       }
+      const primary = existing && await tx('gather_site_domains').where({site_id: input.siteId, is_primary: true}).first();
+      if (primary && primary.hostname !== hostname) throw new SitesError({statusCode: 409, code: 'site_binding_conflict'});
       await tx('gather_sites')
         .insert({
           id: input.siteId,

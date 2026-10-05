@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createServer} from 'node:http';
 import {randomBytes, randomUUID, createHmac} from 'node:crypto';
-import {mkdtemp, mkdir, symlink, rm} from 'node:fs/promises';
+import {mkdtemp, mkdir, symlink, rm, writeFile} from 'node:fs/promises';
 import {join, resolve} from 'node:path';
 import {tmpdir} from 'node:os';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -53,7 +53,7 @@ test('two actual fixed-role publication processes publish independently and reco
   const workspace = randomUUID();
   const folder = await mkdtemp(join(tmpdir(), 'gather-runtime-ci-'));
   const connection = {host: '127.0.0.1', port: 5432, user: 'gather_test', password: 'gather_test', database: 'gather_test', options: '-c search_path=' + namespace};
-  const operator = knex({client: 'pg', connection, pool: {min: 0, max: 3}});
+  let operator = knex({client: 'pg', connection, pool: {min: 0, max: 3}});
   const s3 = s3Fixture();
   let supervisor;
   const runtimes = [];
@@ -79,7 +79,7 @@ test('two actual fixed-role publication processes publish independently and reco
     await registry.registerExistingSite({siteId: ids[0], workspaceId: workspace, subjectId: subject, staffId: owner.id, name: 'Existing', hostname: 'gather.example.test'});
     await operator('gather_sites').insert({id: ids[1], workspace_id: workspace, created_by: subject, name: 'Independent', slug: 'independent', status: 'provisioning', created_at: new Date(), updated_at: new Date()});
     await operator('gather_site_domains').insert({id: randomUUID(), site_id: ids[1], hostname: 'independent.gather.example.test', is_primary: true});
-    const {installTenantIsolation, restoreTenantPrivileges, verifyTenantDatabase, TENANT_TABLES, tenantRole} = require('../core/server/lib/gather/database');
+    const {installTenantIsolation, verifyTenantDatabase, TENANT_TABLES, tenantRole} = require('../core/server/lib/gather/database');
     await installTenantIsolation(operator, ids[0], controlRole);
     await new Promise(resolve => s3.server.listen(0, '127.0.0.1', resolve));
     const endpoint = 'http://127.0.0.1:' + s3.server.address().port;
@@ -144,7 +144,16 @@ test('two actual fixed-role publication processes publish independently and reco
     await operator.raw('DROP SCHEMA ?? CASCADE', [namespace]);
     await exec('/usr/lib/postgresql/16/bin/pg_restore', ['--dbname=' + connection.database, '--no-owner', '--no-privileges', '--exit-on-error', '--single-transaction', dump], {env: pgEnvironment, timeout: 60000});
     assert.deepEqual(await Promise.all(TENANT_TABLES.map(table => operator(table).count('* as count').first())), counts);
-    await restoreTenantPrivileges(operator, controlRole);
+    const operatorFile = join(folder, 'operator.json');
+    const runtimeFile = join(folder, 'runtime.json');
+    await writeFile(operatorFile, JSON.stringify({operatorDatabase: {client: 'pg', connection}, controlRole, controlPassword, runtimeMasterKey: master}), {mode: 0o600});
+    await writeFile(runtimeFile, JSON.stringify(config.get()), {mode: 0o600});
+    await Promise.all(runtimes.map(runtime => runtime.destroy()));
+    await require('../core/server/data/db').knex.destroy();
+    await operator.destroy();
+    await exec(process.execPath, ['scripts/gather-operator.mjs', '--mode', 'restore-grants', '--config', operatorFile], {env: {NODE_ENV: 'production', GATHER_SITE_CONFIG: runtimeFile}, timeout: 60000});
+    operator = knex({client: 'pg', connection, pool: {min: 0, max: 3}});
+    for (const [i, id] of ids.entries()) runtimes[i] = knex({client: 'pg', connection: {...connection, user: tenantRole(id), password: deriveTenantCredential(master, id)}, pool: {min: 0, max: 2}});
     const issuer = knex({client: 'pg', connection: {...connection, user: controlRole, password: controlPassword}});
     try {
       for (const id of ids) await issuer.raw('SELECT gather_ensure_runtime_role(?, ?)', [id, deriveTenantCredential(master, id)]);

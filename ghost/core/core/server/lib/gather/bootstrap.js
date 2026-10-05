@@ -11,6 +11,9 @@ exports.bootstrapTenant = async function bootstrapTenant(config, database) {
   const {FixtureManager} = require('../../data/schema/fixtures');
   const fixtures = structuredClone(require('../../data/schema/fixtures/fixtures.json'));
   const owner = fixtures.models.find(model => model.name === 'User').entries[0];
+  // New publications start empty; upstream demo pages promote Ghost and refer
+  // to membership features the owner has not configured.
+  fixtures.models.find(model => model.name === 'Post').entries = [];
   owner.name = tenant.ownerName || 'Frontro publisher';
   owner.email = `${tenant.ownerSubject}@accounts.frontro.invalid`;
   // Never enable a local password flow for a Moments-created staff account.
@@ -27,4 +30,8 @@ exports.bootstrapTenant = async function bootstrapTenant(config, database) {
   await database('settings').where({key: 'members_signup_access'}).update({value: 'none'});
   await database('settings').where({key: 'icon'}).update({value: config.get('url') + '/public/frontro/icon.png'});
   await database('settings').where({key: 'logo'}).update({value: config.get('url') + '/public/frontro/logo.svg'});
+  await database('settings').whereIn('key', ['facebook', 'twitter', 'cover_image']).update({value: null});
+  await database('settings').where({key: 'description'}).update({value: ''});
+  await database('settings').where({key: 'navigation'}).update({value: JSON.stringify([{label: 'Home', url: '/'}])});
+  await database('settings').where({key: 'secondary_navigation'}).update({value: '[]'});
 };

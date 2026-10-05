@@ -1,14 +1,20 @@
 import {fork} from 'node:child_process';
 import {randomBytes, timingSafeEqual} from 'node:crypto';
 import {createRequire} from 'node:module';
-import {mkdtemp, mkdir, symlink, writeFile, rm} from 'node:fs/promises';
+import {mkdtemp, mkdir, symlink, writeFile, rm, readFile} from 'node:fs/promises';
 import {request as httpRequest} from 'node:http';
 import {join} from 'node:path';
-import {tmpdir} from 'node:os';
+import {tmpdir, totalmem} from 'node:os';
 import {setTimeout as delay} from 'node:timers/promises';
 import {deriveTenantCredential, workerConfiguration} from './gather-worker-config.mjs';
 
 const require = createRequire(import.meta.url);
+
+export function validateRuntimeCapacity(maximumSites, memoryBytes) {
+  // Reserve parent/control headroom plus a full RSS budget per 320 MiB heap.
+  const required = (256 + maximumSites * 768) * 1024 ** 2;
+  if (!Number.isInteger(maximumSites) || maximumSites < 2 || maximumSites > 8 || memoryBytes < required) throw new Error('Configured site capacity exceeds the runtime memory budget');
+}
 
 export async function startSupervisor(testOptions = {}) {
   if (Object.keys(testOptions).length && process.env.GATHER_DISPOSABLE_CI !== '1') throw new Error('Supervisor dependency overrides are disposable-CI only');
@@ -23,6 +29,12 @@ export async function startSupervisor(testOptions = {}) {
     !settings.redis?.host || settings.controlDatabase?.client !== 'pg' || !['staging', 'production'].includes(settings.environment)) {
     throw new Error('Shared tenancy requires a fully projected, bounded configuration');
   }
+  let availableMemory = totalmem();
+  for (const filename of ['/sys/fs/cgroup/memory.max', '/sys/fs/cgroup/memory/memory.limit_in_bytes']) {
+    const value = await readFile(filename, 'utf8').catch(() => null);
+    if (value && /^\d+$/.test(value.trim())) availableMemory = Math.min(availableMemory, Number(value.trim()));
+  }
+  validateRuntimeCapacity(settings.maximumSites, availableMemory);
   const {SiteRegistry, SitesError, canonicalHostname} = require('../core/server/lib/gather/registry');
   const {TENANT_MANIFEST_HASH} = require('../core/server/lib/gather/database');
   const {SealedRedisStore} = require('../core/server/lib/gather/redis-store');
@@ -109,7 +121,8 @@ export async function startSupervisor(testOptions = {}) {
           env: {NODE_ENV: 'production', TZ: 'UTC', GATHER_REQUIRE_POSTGRES: 'true', GATHER_REQUIRE_ORIGIN: 'true', GATHER_SITE_CONFIG: filename},
           stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
         });
-        const worker = {child, port, bridgeSecret, ready: false, hostname: domain.hostname, site};
+        const worker = {child, port, bridgeSecret, ready: false, bootReady: false, hostname: domain.hostname, site};
+        child.on('message', message => {if (message?.ready === true) worker.bootReady = true;});
         workers.set(site.id, worker);
         child.once('exit', () => {
           workers.delete(site.id);
@@ -125,7 +138,7 @@ export async function startSupervisor(testOptions = {}) {
           try {
             const response = await fetch(`http://127.0.0.1:${port}/ghost/api/admin/site/`, {headers: {Host: domain.hostname, 'X-Forwarded-Proto': 'https', 'X-Gather-Origin-Key': originSecret}, signal: AbortSignal.timeout(3000)});
             await response.body?.cancel();
-            if (response.status === 200) {worker.ready = true; break;}
+            if (response.status === 200 && worker.bootReady) {worker.ready = true; break;}
           } catch { /* Boot remains bounded by the deadline. */ }
           await delay(500);
         }

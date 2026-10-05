@@ -270,3 +270,38 @@ export async function verifyTenantDatabase(database: Knex, siteId: string) {
   const views = await database.raw("SELECT c.relname, c.reloptions FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=current_schema() AND c.relkind='v'");
   if (views.rows.length !== 1 || views.rows[0].relname !== 'members_resolved_subscription' || !views.rows[0].reloptions?.includes('security_invoker=true')) throw new errors.IncorrectUsageError({message: 'Publication view isolation differs from the audited inventory'});
 }
+
+// pg_dump --no-privileges deliberately omits ACLs. Run only as the same
+// migration owner on an isolated restored database, before exposing runtimes.
+// Preserve restored row policies and data; reissue only audited privileges.
+export async function restoreTenantPrivileges(database: Knex, controlRole: string) {
+  if (database.client.config.client !== 'pg' || !ROLE.test(controlRole) || controlRole.startsWith('gather_site_')) throw new errors.IncorrectUsageError({message: 'Invalid restore control role'});
+  await database.transaction(async tx => {
+    const state = await tx('gather_tenancy_state').where({key: 'isolation'}).first();
+    if (state?.manifest_hash !== TENANT_MANIFEST_HASH) throw new errors.IncorrectUsageError({message: 'Restored tenancy inventory differs from the running release'});
+    const control = await tx.raw('SELECT rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolinherit, rolreplication FROM pg_roles WHERE rolname=?', [controlRole]);
+    if (!control.rows.length || Object.values(control.rows[0]).some(Boolean)) throw new errors.IncorrectUsageError({message: 'Unsafe restore control role'});
+    if ((await tx.raw('SELECT 1 FROM pg_auth_members WHERE member=(SELECT oid FROM pg_roles WHERE rolname=?)', [controlRole])).rows.length) throw new errors.IncorrectUsageError({message: 'Restore control role memberships are forbidden'});
+    const {rows: [{schema, owner}]} = await tx.raw('SELECT current_schema() AS schema, current_user AS owner');
+    const policies = await tx.raw(`SELECT c.relname, pg_get_userbyid(role) AS owner FROM pg_policy p
+      JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace,
+      unnest(p.polroles) role WHERE n.nspname=? AND p.polname='gather_maintenance'`, [schema]);
+    if (tables.some(table => policies.rows.filter((row: any) => row.relname === table && row.owner === owner).length !== 1)) throw new errors.IncorrectUsageError({message: 'Restore must use the original migration owner'});
+    const staffPolicy = await tx.raw(`SELECT pg_get_userbyid(role) AS role FROM pg_policy p
+      JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace,
+      unnest(p.polroles) role WHERE n.nspname=? AND c.relname='gather_site_staff' AND p.polname='gather_staff_control'`, [schema]);
+    if (staffPolicy.rows.length !== 1 || staffPolicy.rows[0].role !== controlRole) throw new errors.IncorrectUsageError({message: 'Restore control identity differs from the retained policy'});
+    const functionOwner = await tx.raw(`SELECT pg_get_userbyid(p.proowner)=current_user AS owned FROM pg_proc p
+      JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname=? AND p.proname='gather_ensure_runtime_role'`, [schema]);
+    if (functionOwner.rows.length !== 1 || !functionOwner.rows[0].owned) throw new errors.IncorrectUsageError({message: 'Restore runtime issuer is not owned by the migration identity'});
+    await tx.raw('REVOKE CREATE ON SCHEMA ?? FROM PUBLIC', [schema]);
+    await tx.raw('REVOKE ALL ON FUNCTION ??.gather_ensure_runtime_role(text,text) FROM PUBLIC', [schema]);
+    await tx.raw('GRANT EXECUTE ON FUNCTION ??.gather_ensure_runtime_role(text,text) TO ??', [schema, controlRole]);
+    await tx.raw('GRANT USAGE ON SCHEMA ?? TO ??', [schema, controlRole]);
+    for (const table of PLATFORM) {
+      await tx.raw('REVOKE ALL ON ??.?? FROM PUBLIC', [schema, table]);
+      await tx.raw('GRANT SELECT, INSERT, UPDATE, DELETE ON ??.?? TO ??', [schema, table, controlRole]);
+    }
+    for (const table of ['users', 'roles', 'roles_users']) await tx.raw('GRANT SELECT ON ??.?? TO ??', [schema, table, controlRole]);
+  });
+}

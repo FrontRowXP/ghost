@@ -1,6 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {deriveTenantCredential, workerConfiguration} from './gather-worker-config.mjs';
+import {validateRuntimeCapacity} from './gather-supervisor.mjs';
+
+test('a two-GiB shared pod cannot silently accept eight publication processes', () => {
+  assert.doesNotThrow(() => validateRuntimeCapacity(2, 2 * 1024 ** 3));
+  assert.throws(() => validateRuntimeCapacity(8, 2 * 1024 ** 3), /memory budget/);
+  assert.doesNotThrow(() => validateRuntimeCapacity(8, 8 * 1024 ** 3));
+});
 
 test('worker projection fixes identity and isolates object/cache namespaces without control credentials', () => {
   const a = '12345678-1234-1234-1234-123456789abc';

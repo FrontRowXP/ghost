@@ -109,3 +109,10 @@ const tables = {
 module.exports = combineNonTransactionalMigrations(
   ...Object.entries(tables).map(([name, spec]) => addTable(name, spec)),
 );
+const removeRegistry = module.exports.down;
+module.exports.down = async function down(options) {
+  if (await options.connection.schema.hasTable('gather_tenancy_state') && await options.connection('gather_tenancy_state').where({key: 'isolation'}).first()) {
+    throw new Error('Shared tenancy is installed; refusing to remove the site registry');
+  }
+  return removeRegistry(options);
+};

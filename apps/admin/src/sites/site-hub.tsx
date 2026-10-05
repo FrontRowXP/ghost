@@ -82,7 +82,7 @@ function SitesWorkspace({
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [loginTarget, setLoginTarget] = useState<{name: string; hostname: string} | null>(null);
-  const loginFlow = useRef(new URLSearchParams(location.search).get('gatherLogin'));
+  const loginFlow = useRef(new URLSearchParams(location.search).get('gatherLogin') || new URLSearchParams(location.hash.split('?')[1] || '').get('gatherLogin'));
   const connecting = useRef(false);
   const mounted = useRef(true);
 
@@ -237,7 +237,9 @@ function SitesWorkspace({
       <AuthModal
         apiOrigin={apiOrigin}
         initialMode={mode}
-        oauthReturnTo={new URL('sites/', location.origin + location.pathname).href}
+        oauthReturnTo={loginFlow.current
+          ? location.origin + '/ghost/sites/?gatherLogin=' + encodeURIComponent(loginFlow.current)
+          : new URL('sites/', location.origin + location.pathname).href}
         onAuthenticated={connect}
         onClose={() => setMode(null)}
       />

@@ -9,9 +9,12 @@ import {mkdtemp, mkdir, symlink, rm} from 'node:fs/promises';
 import {join, resolve} from 'node:path';
 import {tmpdir} from 'node:os';
 import {setTimeout as delay} from 'node:timers/promises';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {startSupervisor} from './gather-supervisor.mjs';
 import {deriveTenantCredential} from './gather-worker-config.mjs';
 const require = createRequire(import.meta.url);
+const exec = promisify(execFile);
 
 function s3Fixture() {
   const objects = new Map();
@@ -75,7 +78,7 @@ test('two actual fixed-role publication processes publish independently and reco
     await registry.registerExistingSite({siteId: ids[0], workspaceId: workspace, subjectId: subject, staffId: owner.id, name: 'Existing', hostname: 'gather.example.test'});
     await operator('gather_sites').insert({id: ids[1], workspace_id: workspace, created_by: subject, name: 'Independent', slug: 'independent', status: 'provisioning', created_at: new Date(), updated_at: new Date()});
     await operator('gather_site_domains').insert({id: randomUUID(), site_id: ids[1], hostname: 'gather-independent.example.test', is_primary: true});
-    const {installTenantIsolation, tenantRole} = require('../core/server/lib/gather/database');
+    const {installTenantIsolation, restoreTenantPrivileges, verifyTenantDatabase, TENANT_TABLES, tenantRole} = require('../core/server/lib/gather/database');
     await installTenantIsolation(operator, ids[0], controlRole);
     await new Promise(resolve => s3.server.listen(0, '127.0.0.1', resolve));
     const endpoint = 'http://127.0.0.1:' + s3.server.address().port;
@@ -100,7 +103,7 @@ test('two actual fixed-role publication processes publish independently and reco
       assert.ok(key?.secret);
       const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
       const now = Math.floor(Date.now() / 1000);
-      const input = encode({alg: 'HS256', typ: 'JWT', kid: key.id}) + '.' + encode({iat: now, exp: now + 180, aud: '/admin/'});
+      const input = encode({alg: 'HS256', typ: 'JWT', kid: key.id}) + '.' + encode({iat: now, exp: now + 600, aud: '/admin/'});
       tokens.push(input + '.' + createHmac('sha256', Buffer.from(key.secret, 'hex')).update(input).digest('base64url'));
     }
     const posts = [];
@@ -113,8 +116,48 @@ test('two actual fixed-role publication processes publish independently and reco
     assert.equal((await request(hosts[0], '/ghost/api/admin/posts/' + posts[1].id + '/', {headers: {Authorization: 'Ghost ' + tokens[0]}})).status, 404);
     assert.equal((await request(hosts[1], '/ghost/api/admin/posts/', {headers: {Authorization: 'Ghost ' + tokens[0]}})).status, 401);
     assert.equal((await request('unregistered.example.test', '/ghost/api/admin/site/')).status, 404);
+    const scheduled = [];
+    for (const [i, host] of hosts.entries()) {
+      const response = await request(host, '/ghost/api/admin/posts/?source=html', {method: 'POST', headers: {Authorization: 'Ghost ' + tokens[i], 'Content-Type': 'application/json'}, body: JSON.stringify({posts: [{title: 'Recovered schedule ' + i, slug: 'shared-schedule', status: 'scheduled', published_at: new Date(Date.now() + 180000).toISOString(), html: '<p>Durable schedule</p>'}]})});
+      assert.equal(response.status, 201, await response.text().then(body => response.status === 201 ? '' : body));
+      scheduled.push(await runtimes[i]('posts').where({slug: 'shared-schedule'}).first());
+      const bytes = Buffer.from('Publication ' + i);
+      const form = new FormData(); form.append('file', new Blob([bytes], {type: 'text/plain'}), 'shared-file.txt');
+      const upload = await request(host, '/ghost/api/admin/files/upload/', {method: 'POST', headers: {Authorization: 'Ghost ' + tokens[i]}, body: form});
+      assert.equal(upload.status, 201);
+      const url = new URL((await upload.json()).files[0].url);
+      const prefix = i ? 'sites/' + ids[i] + '/' : '';
+      assert.equal(url.hostname, host);
+      assert.ok(url.pathname.startsWith('/_assets/' + prefix + 'content/files/'));
+      assert.deepEqual(s3.objects.get(url.pathname.slice('/_assets/'.length)).body, bytes);
+    }
     await supervisor.shutdown();
+    for (const post of scheduled) await operator('posts').where({id: post.id}).update({published_at: new Date(Date.now() - 5000)});
+    // Actual pg_dump/pg_restore, retaining the shared database and schema.
+    // Only this unique disposable CI schema is removed during the rehearsal.
+    const counts = await Promise.all(TENANT_TABLES.map(table => operator(table).count('* as count').first()));
+    const dump = join(folder, 'restore.dump');
+    const pgEnvironment = {...process.env, PGHOST: connection.host, PGPORT: String(connection.port), PGUSER: connection.user, PGPASSWORD: connection.password, PGDATABASE: connection.database};
+    await exec('/usr/lib/postgresql/16/bin/pg_dump', ['--format=custom', '--no-owner', '--no-privileges', '--schema=' + namespace, '--file=' + dump], {env: pgEnvironment, timeout: 60000});
+    await operator.raw('DROP SCHEMA ?? CASCADE', [namespace]);
+    await exec('/usr/lib/postgresql/16/bin/pg_restore', ['--dbname=' + connection.database, '--no-owner', '--no-privileges', '--exit-on-error', '--single-transaction', dump], {env: pgEnvironment, timeout: 60000});
+    assert.deepEqual(await Promise.all(TENANT_TABLES.map(table => operator(table).count('* as count').first())), counts);
+    await restoreTenantPrivileges(operator, controlRole);
+    const issuer = knex({client: 'pg', connection: {...connection, user: controlRole, password: controlPassword}});
+    try {
+      for (const id of ids) await issuer.raw('SELECT gather_ensure_runtime_role(?, ?)', [id, deriveTenantCredential(master, id)]);
+    } finally {await issuer.destroy();}
+    for (const [i, runtime] of runtimes.entries()) {
+      await verifyTenantDatabase(runtime, ids[i]);
+      await assert.rejects(runtime.raw('SELECT gather_ensure_runtime_role(?, ?)', [ids[i], deriveTenantCredential(master, ids[i])]), /permission denied/);
+    }
     supervisor = await start();
+    const recoveryDeadline = Date.now() + 20000;
+    while (Date.now() < recoveryDeadline) {
+      if ((await Promise.all(runtimes.map((runtime, i) => runtime('posts').where({id: scheduled[i].id}).first()))).every(post => post.status === 'published')) break;
+      await delay(250);
+    }
+    for (const [i, runtime] of runtimes.entries()) assert.equal((await runtime('posts').where({id: scheduled[i].id}).first()).status, 'published', 'The fixed worker must recover its overdue scheduled post');
     for (const [i, host] of hosts.entries()) {
       const response = await request(host, '/ghost/api/admin/posts/' + posts[i].id + '/', {headers: {Authorization: 'Ghost ' + tokens[i]}});
       assert.equal(response.status, 200);

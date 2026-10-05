@@ -17,15 +17,18 @@ const {SiteRegistry} = require('../core/server/lib/gather/registry');
 if (input.operatorDatabase?.client !== 'pg' || !/^[a-z_][a-z0-9_]{0,62}$/.test(input.controlRole || '') || input.controlRole.startsWith('gather_site_') || !/^[a-f0-9]{64}$/.test(input.controlPassword || '') || !/^[a-f0-9]{64}$/.test(input.runtimeMasterKey || '')) throw new Error('Invalid private operator identity projection');
 config.set('database', input.operatorDatabase);
 const database = require('knex')({...input.operatorDatabase, pool: {min: 0, max: 1}});
+let stage = 'quiescence';
 try {
   const peers = await database.raw('SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND backend_type=\'client backend\'');
   if (peers.rows.length) throw new Error('Stop all application connections before the offline tenancy rollout');
   if (args.mode === 'install') {
+    stage = 'verified_backup';
     const attestation = JSON.parse(await readFile(input.backupAttestationPath, 'utf8'));
     if (!/^[a-f0-9]{64}$/.test(attestation.sha256 || '') || Date.now() - Date.parse(attestation.verifiedAt) < 0 || Date.now() - Date.parse(attestation.verifiedAt) > 86400000 || !Number.isFinite(Date.parse(attestation.verifiedAt)) || attestation.database !== input.operatorDatabase.connection.database) throw new Error('A recent verified encrypted backup is required');
     const hash = createHash('sha256'); await pipeline(createReadStream(attestation.file), hash);
     if (hash.digest('hex') !== attestation.sha256) throw new Error('The retained encrypted backup differs from its NAS attestation');
     const enrollment = input.enrollment;
+    stage = 'owner_enrollment';
     const auth = config.get('security:frontroAuth');
     if (!enrollment || auth?.enabled !== true || auth.staff?.[enrollment.subjectId] !== enrollment.staffId || !['https://moments.frontro.com', 'https://api.moments.frontro.com'].includes(auth.apiOrigin)) throw new Error('Existing owner enrollment must match its previously verified Moments binding');
     let principal;
@@ -40,26 +43,36 @@ try {
       if (candidate.user?.id === enrollment.subjectId && candidate.workspaces?.some(workspace => workspace.id === enrollment.workspaceId && workspace.role === 'owner')) {principal = candidate; break;}
     }
     if (!principal) throw new Error('The existing bound owner needs a current Moments session and owned workspace');
+    stage = 'canonical_migrations';
     await new (require('../core/server/data/db/database-state-manager'))({knexMigratorFilePath: config.get('paths:appRoot')}).makeReady();
+    stage = 'control_identity';
     const existing = await database.raw('SELECT 1 FROM pg_roles WHERE rolname=?', [input.controlRole]);
     if (!existing.rows.length) await database.raw(`CREATE ROLE ?? LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '${input.controlPassword}'`, [input.controlRole]);
     await new SiteRegistry(database).registerExistingSite(enrollment);
+    stage = 'tenant_isolation';
     await installTenantIsolation(database, enrollment.siteId, input.controlRole);
   } else {
+    stage = 'restore_privileges';
     await restoreTenantPrivileges(database, input.controlRole);
   }
   // Existing cluster roles must authenticate with the projected private password;
   // never silently rotate a role that may belong to another environment.
+  stage = 'control_authentication';
   const control = require('knex')({...input.operatorDatabase, connection: {...input.operatorDatabase.connection, user: input.controlRole, password: input.controlPassword}, pool: {min: 0, max: 1}, acquireConnectionTimeout: 8000});
   try {
     const identity = await control.raw('SELECT current_user AS role');
     if (identity.rows[0]?.role !== input.controlRole) throw new Error('Projected control identity does not authenticate');
   } finally {await control.destroy();}
+  stage = 'runtime_identities';
   for (const site of await database('gather_sites').whereIn('status', ['active', 'provisioning'])) {
     tenantRole(site.id);
     await database.raw('SELECT gather_ensure_runtime_role(?, ?)', [site.id, deriveTenantCredential(input.runtimeMasterKey, site.id)]);
   }
   console.log(JSON.stringify({event: 'gather_offline_tenancy_operator_complete', mode: args.mode}));
+} catch {
+  // PostgreSQL errors may embed credential-bearing CREATE ROLE statements.
+  console.error(JSON.stringify({event: 'gather_offline_tenancy_operator_failed', mode: args.mode, stage}));
+  process.exitCode = 1;
 } finally {
   await database.destroy();
   await require('../core/server/data/db').knex.destroy();

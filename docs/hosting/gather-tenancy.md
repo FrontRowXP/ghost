@@ -28,7 +28,8 @@ authentication and encrypted recovery acceptance pass. See [Gather hosting](gath
 - Separate origins isolate tenant custom JavaScript. Staging uses
   `<slug>.gather-stage.frontro.com`; production uses `<slug>.gather.frontro.com`.
   Each zone needs DNS, CDN hostname preservation and origin authentication, and
-  matching wildcard origin TLS. Unknown/unverified hosts never resolve to a site.
+  a matching edge wildcard certificate and verified origin TLS. Unknown/unverified
+  hosts never resolve to a site.
 - Moments signup/login stays on the trusted hub at `/ghost/#/sites`, using the
   same modal and API. Credentialed Moments CORS remains restricted to reviewed
   hub origins. A browser-, hostname- and site-bound one-use grant opens a site's
@@ -99,6 +100,31 @@ the hub hostname and reviewed `--maximum-sites`. The runtime command is
 non-owner roles and no migration capability. Enable `creationEnabled` only after
 real two-site acceptance succeeds.
 
+## Existing CDN commissioning
+
+The existing services are `Gather Staging` (`aRKJKLitloQE3sW2X3l0dJ`) and
+`Gather Production` (`tyetphulke2W2dD90fsLXA`). Commission staging first. Clone
+its active Fastly version, preserving the origin credential without printing it.
+Add `*.gather-stage.frontro.com` to that service. For production, use
+`*.gather.frontro.com` in its separate service. Preserve the verified root domain.
+
+Both current receive snippets and backend `override_host` rewrite all requests to
+the hub hostname. Remove both rewrites for shared tenancy. Reject hosts outside
+the corresponding hub/one-label tenant zone, preserve the validated request Host,
+and preserve the HTTPS scheme and injected origin credential. Redirect HTTP to
+`https://` plus that same validated hostname and request URL. Keep pass-through
+behavior for publishing, authentication and assets; strip the origin credential
+from responses. Validate the cloned version before activation.
+
+Each tenant zone needs a Fastly edge wildcard certificate and its validation DNS.
+The service-scoped API keys currently reject TLS management with HTTP 403; they
+cannot commission those certificates. Existing wildcard DNS already resolves
+nested Gather names to Fastly, but it does not assign them to the Gather services
+or provide a matching edge certificate. Existing origin SNI/certificate validation
+may remain pinned to the verified hub while HTTP Host selects its tenant ingress;
+otherwise provision the matching wildcard origin certificate before changing SNI.
+Never disable origin certificate verification or its injected credential.
+
 ## Recovery
 
 Operator backups include both object prefixes, one exported PostgreSQL snapshot,
@@ -133,5 +159,8 @@ certify real NAS or TLS.
 Real staging acceptance must also prove independent owner login/revocation,
 public HTTPS rendering, NAS multipart uploads/range reads/deletion, encrypted
 asset/database recovery and provisioning failure/retry. Keep production disabled
-on any failed boundary. The current NAS multipart UploadPart timeout and abort
-503 require infrastructure repair; a successful health read is insufficient.
+on any failed boundary. The current NAS multipart UploadPart times out even for a 16-KiB part with both
+SDK and legacy AWS CLI clients, while an ordinary five-MiB PutObject succeeds.
+This isolates the failing multipart service path. Diagnostic objects/uploads were
+removed. Inspect and repair the NAS service before qualification; successful
+health reads or ordinary writes are insufficient.

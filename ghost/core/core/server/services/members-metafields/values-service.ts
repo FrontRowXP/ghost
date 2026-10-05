@@ -1,3 +1,4 @@
+const tenantConflictColumns = require('../../lib/gather/conflict-columns');
 import ObjectID from 'bson-objectid';
 import errors from '@tryghost/errors';
 import logging from '@tryghost/logging';
@@ -436,7 +437,7 @@ export class MetafieldValuesService {
           .insert(rows.slice(from, from + UPSERT_CHUNK))
           // Naming the columns rather than giving values takes each from the row
           // that lost the conflict, so every part updates to its own value.
-          .onConflict(['member_id', 'metafield_key', 'path'])
+          .onConflict(tenantConflictColumns(['member_id', 'metafield_key', 'path']))
           // The writer is merged with the value, so a leaf names who wrote what
           // it currently holds rather than who wrote its first value.
           .merge(['value_text', 'written_by_type', 'written_by_id', 'updated_at']);

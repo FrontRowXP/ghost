@@ -47,7 +47,7 @@ export function createGateway({ client, bucket, originSecret }) {
         response.writeHead(400).end();
         return;
       }
-      if (!['content/images/', 'content/media/', 'content/files/'].some(prefix => key.startsWith(prefix)) ||
+      if (!/^(?:sites\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\/)?content\/(?:images|media|files)\//.test(key) ||
           key.split('/').some(part => part === '..' || part === '.') || /[\\\x00-\x1f\x7f]/.test(key)) {
         response.writeHead(404).end();
         return;
@@ -69,7 +69,7 @@ export function createGateway({ client, bucket, originSecret }) {
         'Content-Security-Policy': "default-src 'none'; sandbox",
         'Accept-Ranges': 'bytes',
       };
-      if (key.startsWith('content/files/')) headers['Content-Disposition'] = 'attachment';
+      if (key.replace(/^sites\/[^/]+\//, '').startsWith('content/files/')) headers['Content-Disposition'] = 'attachment';
       if (object.ContentLength !== undefined) headers['Content-Length'] = String(object.ContentLength);
       if (object.ETag) headers.ETag = object.ETag;
       if (object.LastModified) headers['Last-Modified'] = object.LastModified.toUTCString();

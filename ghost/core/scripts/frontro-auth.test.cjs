@@ -55,6 +55,31 @@ test('configuration is opt-in, HTTPS-only and never publishes staff links', () =
   }
 });
 
+test('fixed-site delegation rechecks the workspace binding and uses the trusted hub origin upstream', async () => {
+  let permitted = true;
+  let assigned = 0;
+  const workspace = '98765432-1234-1234-1234-123456789abc';
+  const identity = {user: {id: subject}, workspaces: [{id: workspace, role: 'owner'}]};
+  const user = {id: 'owner', get: () => 'active'};
+  const req = {session: session()};
+  const res = {set() {}, json() {}};
+  const bridge = createFrontroAuth({getConfig: () => ({enabled: true, apiOrigin: 'https://moments.example.test'}), getAdminOrigin: () => 'https://gather-site.example.test', getUpstreamOrigin: () => origin,
+    resolveStaff: async (id, data) => permitted && id === subject && data.workspaces.some(item => item.id === workspace) ? 'owner' : null,
+    findUserById: async id => id === 'owner' ? user : null,
+    createSession: async req => {assigned++; req.session = session({user_id: 'owner'});},
+    fetch: async (url, options) => {assert.equal(options.headers.Origin, origin); return url.endsWith('/me') ? Response.json(identity) : new Response(null, {status: 204});}
+  });
+  const stored = {cookie: '__Host-moments_session=' + sessionToken, subject, csrf: 'c'.repeat(64)};
+  assert.equal(await bridge.validate(session({user_id: 'owner'})), false);
+  await bridge.acceptDelegation(req, res, stored);
+  assert.equal(assigned, 1);
+  assert.equal(await bridge.validate(req.session), true);
+  permitted = false;
+  assert.equal(await bridge.validate(req.session), false);
+  await assert.rejects(bridge.acceptDelegation(req, res, stored), {statusCode: 403});
+  assert.equal(assigned, 1);
+});
+
 test('one-use handoff stays server-side and issues only a linked staff session', async () => {
   const t = setup();
   await t.bridge.start(t.req, t.res);

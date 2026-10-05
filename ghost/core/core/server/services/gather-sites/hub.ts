@@ -9,7 +9,7 @@ import {
 import { SealedRedisStore } from '../../lib/gather/redis-store';
 
 const { createFrontroAuth } = require('../auth/frontro-auth');
-const COOKIE = '__Secure-frontro-sites-session';
+const LEGACY_COOKIE = '__Secure-frontro-sites-session';
 const TOKEN = /^[a-f0-9]{64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 interface Delegation {
@@ -22,12 +22,12 @@ interface HubSession {
   csrf: string;
   expiresAt: number;
 }
-function tokenFrom(req: Request) {
+function tokenFrom(req: Request, cookieName = LEGACY_COOKIE) {
   const cookies = (req.get('cookie') || '')
     .split(';')
     .map((value) => value.trim())
-    .filter((value) => value.startsWith(COOKIE + '='));
-  const token = cookies.length === 1 ? cookies[0].slice(COOKIE.length + 1) : '';
+    .filter((value) => value.startsWith(cookieName + '='));
+  const token = cookies.length === 1 ? cookies[0].slice(cookieName.length + 1) : '';
   return TOKEN.test(token) ? token : null;
 }
 function verifiedPrincipal(value: any): Principal {
@@ -59,6 +59,7 @@ export function createSiteHub({
   apiOrigin,
   now = Date.now,
   fetch = globalThis.fetch,
+  staffLogin,
 }: {
   registry: SiteRegistry;
   sessions: SealedRedisStore;
@@ -68,7 +69,9 @@ export function createSiteHub({
   apiOrigin: string;
   now?: () => number;
   fetch?: typeof globalThis.fetch;
+  staffLogin?: {read(flow: string): Promise<{name: string}>; complete(flow: string, principal: Principal, delegation: Delegation): Promise<string>};
 }) {
+  const COOKIE = cookiePath === '/' ? '__Host-frontro-sites-session' : LEGACY_COOKIE;
   const cookieOptions = {
     secure: true,
     httpOnly: true,
@@ -80,12 +83,12 @@ export function createSiteHub({
     getAdminOrigin: () => origin,
     getAdminPath: () => cookiePath,
     handoffStore: handoffs,
-    bindingCookie: '__Secure-frontro-sites-handoff',
+    bindingCookie: cookiePath === '/' ? '__Host-frontro-sites-handoff' : '__Secure-frontro-sites-handoff',
     now,
     fetch,
     async acceptIdentity(req: Request, res: Response, raw: unknown, delegation: Delegation) {
       verifiedPrincipal(raw);
-      const old = tokenFrom(req);
+      const old = tokenFrom(req, COOKIE);
       if (old) {
         const previous: HubSession | null = await sessions.consume(old);
         if (previous) {
@@ -112,7 +115,7 @@ export function createSiteHub({
     }
   }
   async function current(req: Request) {
-    const token = tokenFrom(req);
+    const token = tokenFrom(req, COOKIE);
     const session: HubSession | null = token ? await sessions.get(token) : null;
     if (!session || session.expiresAt <= now()) {
       throw new SitesError({ statusCode: 401, code: 'authentication_required' });
@@ -141,20 +144,30 @@ export function createSiteHub({
     },
     async session(req: Request, res: Response) {
       const { session, principal } = await current(req);
-      return res.json({ ...principal, csrfToken: session.csrf, creationEnabled: false });
+      return res.json({ ...principal, csrfToken: session.csrf, creationEnabled: registry.creationEnabled === true });
     },
     async browse(req: Request, res: Response) {
       const { principal } = await current(req);
-      return res.json({ sites: await registry.browse(principal), creationEnabled: false });
+      return res.json({ sites: await registry.browse(principal), creationEnabled: registry.creationEnabled === true });
     },
     async create(req: Request, res: Response) {
       const { session, principal } = await current(req);
       csrf(req, session);
-      await registry.create(req.body || {}, principal);
-      return res.sendStatus(201);
+      const site = await registry.create(req.body || {}, principal);
+      return res.status(201).json({site});
+    },
+    async readStaffLogin(req: Request, res: Response) {
+      if (!staffLogin || typeof req.query.flow !== 'string' || !TOKEN.test(req.query.flow)) throw new SitesError({statusCode: 404, code: 'site_not_found'});
+      return res.json(await staffLogin.read(req.query.flow));
+    },
+    async completeStaffLogin(req: Request, res: Response) {
+      const {session, principal} = await current(req);
+      csrf(req, session);
+      if (!staffLogin || !TOKEN.test(req.body?.flow || '')) throw new SitesError({statusCode: 404, code: 'site_not_found'});
+      return res.json({redirect: await staffLogin.complete(req.body.flow, principal, session.delegation)});
     },
     async logout(req: Request, res: Response) {
-      const token = tokenFrom(req);
+      const token = tokenFrom(req, COOKIE);
       const session: HubSession | null = token ? await sessions.get(token) : null;
       if (session) {
         csrf(req, session);
@@ -167,7 +180,7 @@ export function createSiteHub({
       res.clearCookie(COOKIE, cookieOptions);
       return res.sendStatus(204);
     },
-    capability: { apiOrigin, creationEnabled: false, version: 1 },
-    blockers: CREATION_BLOCKERS,
+    capability: { apiOrigin, creationEnabled: registry.creationEnabled === true, version: 1 },
+    blockers: registry.creationEnabled === true ? [] : CREATION_BLOCKERS,
   };
 }

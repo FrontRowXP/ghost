@@ -43,7 +43,11 @@ function loadNconf(options?: LoadNconfOptions): ConfigInstance {
   });
 
   // Now load various config json files
-  nconf.file('custom-env', path.join(customConfigPath, 'config.' + env + '.json'));
+  const workerConfig = process.env.GATHER_SITE_CONFIG;
+  if (workerConfig && !path.isAbsolute(workerConfig)) {
+    throw new Error('Gather worker configuration must use an absolute private path');
+  }
+  nconf.file('custom-env', workerConfig || path.join(customConfigPath, 'config.' + env + '.json'));
   if (!env.startsWith('testing')) {
     if (process.env.GHOST_DEV_IS_DOCKER === 'true') {
       nconf.file('docker-env', path.join(baseConfigPath, 'env', 'config.development.docker.json'));

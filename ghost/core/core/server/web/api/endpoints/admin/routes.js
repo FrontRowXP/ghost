@@ -16,6 +16,12 @@ module.exports = function apiRoutes() {
   const router = express.Router('admin api');
 
   router.use(apiMw.cors);
+  if (require('../../../../../shared/config').get('gather:tenant:siteId')) {
+    router.use((req, res, next) => {
+      if (req.method === 'POST' && req.path === '/session' || req.path.startsWith('/authentication/password_reset') || req.path.startsWith('/authentication/setup')) return res.sendStatus(404);
+      next();
+    });
+  }
 
   // ## Public
   router.get('/site', mw.publicAdminApi, http(api.site.read));
@@ -428,6 +434,26 @@ module.exports = function apiRoutes() {
   router.get('/featurebase/token', mw.authAdminApi, http(api.featurebase.token));
 
   // ## Sessions
+  // A browser cannot send this private supervisor credential. The gateway
+  // never proxies this route; it consumes a bound, one-use login grant first.
+  router.post('/authentication/gather/delegation', async (req, res, next) => {
+    const config = require('../../../../../shared/config');
+    const secret = config.get('gather:tenant:bridgeSecret');
+    const {timingSafeEqual} = require('node:crypto');
+    const supplied = Buffer.from(req.get('x-gather-worker-key') || '');
+    if (!secret || !['127.0.0.1', '::ffff:127.0.0.1', '::1'].includes(req.socket.remoteAddress) ||
+      supplied.length !== Buffer.byteLength(secret) || !timingSafeEqual(supplied, Buffer.from(secret))) {
+      return res.sendStatus(404);
+    }
+    try {
+      await auth.session.initSession(req, res, error => {
+        if (error) return next(error);
+        Promise.resolve(auth.session.frontroAuth.acceptDelegation(req, res, req.body)).catch(next);
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
   // We don't need auth when creating a new session (logging in)
   router.post(
     '/session',

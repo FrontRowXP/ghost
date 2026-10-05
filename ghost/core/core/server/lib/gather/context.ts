@@ -78,7 +78,10 @@ export async function withSiteTransaction<T>(
         message: 'Publishing table isolation is not installed',
       });
     }
-    await tx.raw("SELECT set_config('gather.site_id', ?, true)", [context.siteId]);
+    const identity = await tx.raw('SELECT gather_current_site() AS site');
+    if (identity.rows[0]?.site !== context.siteId) {
+      throw new errors.IncorrectUsageError({message: 'Site context does not match the immutable database login'});
+    }
     return work(tx);
   });
 }

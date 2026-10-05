@@ -27,6 +27,10 @@ function message(cause: unknown) {
   if (cause instanceof SiteManagementError && cause.code === 'workspace_owner_required') {
     return 'Only a workspace owner can create a site.';
   }
+  if (cause instanceof SiteManagementError && cause.code === 'site_address_in_use') return 'This site address is already in use. Choose another address.';
+  if (cause instanceof SiteManagementError && cause.code === 'site_capacity_reached') return 'Site capacity has been reached. Your existing sites are still available.';
+  if (cause instanceof SiteManagementError && cause.code === 'site_login_expired') return 'This sign-in link has expired. Open your site and sign in again.';
+  if (cause instanceof SiteManagementError && cause.code === 'invalid_site_details') return 'Enter a site name and an address using lowercase letters, numbers, and hyphens.';
   if (cause instanceof SiteManagementError) {
     return authMessage(new AuthError(cause.code, cause.status));
   }
@@ -36,6 +40,9 @@ function message(cause: unknown) {
 export default function SiteHub() {
   const { data, isLoading } = useBrowseSite();
   const capability = data?.site.gatherSites;
+  useEffect(() => {
+    if (capability?.hubUrl) location.assign(capability.hubUrl);
+  }, [capability?.hubUrl]);
   if (isLoading) {
     return (
       <main className="gather-sites">
@@ -74,8 +81,19 @@ function SitesWorkspace({
   const [workspace, setWorkspace] = useState('');
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
+  const [loginTarget, setLoginTarget] = useState<{name: string; hostname: string} | null>(null);
+  const loginFlow = useRef(new URLSearchParams(location.search).get('gatherLogin'));
   const connecting = useRef(false);
   const mounted = useRef(true);
+
+  useEffect(() => {
+    if (!loginFlow.current || !/^[a-f0-9]{64}$/.test(loginFlow.current)) return;
+    let active = true;
+    void request<{name: string; hostname: string}>('auth/site/?flow=' + loginFlow.current)
+      .then(target => {if (active) setLoginTarget(target);})
+      .catch(cause => {if (active) setError(message(cause));});
+    return () => {active = false;};
+  }, []);
 
   const load = useCallback(async () => {
     const identity = await request<HubSession>('session/');
@@ -194,6 +212,26 @@ function SitesWorkspace({
       setCreating(false);
     }
   }
+  useEffect(() => {
+    if (!session || !sites.some(site => site.status === 'provisioning')) return;
+    const timer = setInterval(() => {
+      void request<{sites: Site[]}>('sites/').then(result => {if (mounted.current) setSites(result.sites);})
+        .catch(cause => {if (mounted.current) setError(message(cause));});
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [session, sites]);
+
+  async function openPublication() {
+    if (!session || !loginFlow.current || creating) return;
+    setCreating(true);
+    try {
+      const result = await request<{redirect: string}>('auth/site/', {flow: loginFlow.current}, session.csrfToken);
+      location.assign(result.redirect);
+    } catch (cause) {
+      setError(message(cause));
+      setCreating(false);
+    }
+  }
   if (mode && !session) {
     return (
       <AuthModal
@@ -234,6 +272,11 @@ function SitesWorkspace({
         <p role="status">New sites are not available yet. Sign in to manage your existing sites.</p>
       )}
       {error && <p role="alert">{error}</p>}
+      {session && loginTarget && <section className="gather-site-card">
+        <h2>Open {loginTarget.name}</h2>
+        <p>Continue to {loginTarget.hostname} with your Frontro account.</p>
+        <Button disabled={creating} onClick={() => void openPublication()}>Continue to site</Button>
+      </section>}
       {checking ? (
         <p role="status">Opening your sites…</p>
       ) : !session ? (
@@ -267,6 +310,8 @@ function SitesWorkspace({
                   <p>{site.hostname || 'Your domain is being prepared'}</p>
                   {site.status === 'active' && site.verified_at && site.hostname ? (
                     <a href={`https://${site.hostname}/ghost/`}>Edit site</a>
+                  ) : site.status === 'failed' ? (
+                    <span role="status">Site setup failed. Retry with the same site name and address.</span>
                   ) : (
                     <span role="status">Preparing your site</span>
                   )}
@@ -317,7 +362,7 @@ function SitesWorkspace({
               <Label htmlFor="site-slug">Site address</Label>
               <Input
                 id="site-slug"
-                maxLength={63}
+                maxLength={40}
                 pattern="[a-z0-9]+(-[a-z0-9]+)*"
                 placeholder="my-publication"
                 value={slug}

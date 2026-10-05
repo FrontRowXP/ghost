@@ -51,8 +51,14 @@ export const CREATION_BLOCKERS = Object.freeze([
 
 export class SiteRegistry {
   private readonly database: Knex;
-  constructor(database: Knex) {
+  private readonly provisioner?: {maximumSites: number; hostname(slug: string): string; queue(site: Site): void};
+  constructor(database: Knex, provisioner?: {maximumSites: number; hostname(slug: string): string; queue(site: Site): void}) {
     this.database = database;
+    this.provisioner = provisioner;
+  }
+
+  get creationEnabled() {
+    return Boolean(this.provisioner);
   }
 
   async browse(principal: Principal) {
@@ -63,14 +69,20 @@ export class SiteRegistry {
     // Workspace visibility is necessary but not a staff grant. An explicit
     // Moments subject-to-site staff link is also required to open Admin.
     return this.database('gather_sites as sites')
-      .join('gather_site_staff as staff', 'staff.site_id', 'sites.id')
-      .join('users as users', 'users.id', 'staff.staff_id')
+      .leftJoin('gather_site_staff as staff', function () {
+        this.on('staff.site_id', '=', 'sites.id').andOnVal('staff.subject_id', principal.user.id);
+      })
+      .leftJoin('users as users', 'users.id', 'staff.staff_id')
       .leftJoin('gather_site_domains as domains', function () {
         this.on('domains.site_id', '=', 'sites.id').andOnVal('domains.is_primary', true);
       })
       .whereIn('sites.workspace_id', workspaceIds)
-      .where('staff.subject_id', principal.user.id)
-      .where('users.status', 'active')
+      .where(function () {
+        this.where('users.status', 'active').orWhere(function () {
+          this.whereIn('sites.status', ['provisioning', 'failed']).where('sites.created_by', principal.user.id)
+            .whereIn('sites.workspace_id', principal.workspaces.filter(workspace => workspace.role === 'owner').map(workspace => workspace.id));
+        });
+      })
       .select(
         'sites.id',
         'sites.name',
@@ -204,12 +216,42 @@ export class SiteRegistry {
     });
   }
 
-  async create(input: { workspaceId?: string }, principal: Principal): Promise<never> {
+  async create(input: { workspaceId?: string; name?: string; slug?: string }, principal: Principal) {
     const workspace = principal.workspaces.find((item) => item.id === input.workspaceId);
     if (workspace?.role !== 'owner') {
       throw new SitesError({ statusCode: 403, code: 'workspace_owner_required' });
     }
-    // No rows/jobs/assets are created until every isolation gate is real.
-    throw new SitesError({ statusCode: 503, code: 'site_creation_unavailable' });
+    const provisioner = this.provisioner;
+    if (!provisioner) throw new SitesError({ statusCode: 503, code: 'site_creation_unavailable' });
+    if (typeof input.name !== 'string' || !input.name.trim() || input.name.length > 191 ||
+      typeof input.slug !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.slug) || input.slug.length > 40 ||
+      ['gather', 'stage', 'www', 'api', 'auth', 'assets', 'admin'].includes(input.slug)) {
+      throw new SitesError({statusCode: 400, code: 'invalid_site_details'});
+    }
+    // Slug is a durable idempotency key. A lost response/restart reuses the same
+    // site only for the same verified creator/workspace/name, never a new grant.
+    const site: Site = await this.database.transaction(async tx => {
+      await tx.raw("SELECT pg_advisory_xact_lock(hashtextextended('gather-provisioning', 0))");
+      const existing = await tx('gather_sites').where({slug: input.slug}).first();
+      if (existing) {
+        if (existing.workspace_id !== workspace.id || existing.created_by !== principal.user.id || existing.name !== input.name!.trim()) {
+          throw new SitesError({statusCode: 409, code: 'site_address_in_use'});
+        }
+        if (!['active', 'provisioning', 'failed'].includes(existing.status)) throw new SitesError({statusCode: 409, code: 'site_address_in_use'});
+        if (existing.status === 'failed') {
+          await tx('gather_sites').where({id: existing.id}).update({status: 'provisioning', updated_at: new Date()});
+          existing.status = 'provisioning';
+        }
+        return existing;
+      }
+      const count = await tx('gather_sites').count({count: '*'}).first();
+      if (Number(count?.count) >= provisioner.maximumSites) throw new SitesError({statusCode: 429, code: 'site_capacity_reached'});
+      const created = {id: randomUUID(), workspace_id: workspace.id, name: input.name!.trim(), slug: input.slug!, status: 'provisioning', created_by: principal.user.id, created_at: new Date(), updated_at: new Date()};
+      await tx('gather_sites').insert(created);
+      await tx('gather_site_domains').insert({id: randomUUID(), site_id: created.id, hostname: canonicalHostname(provisioner.hostname(created.slug)), is_primary: true, verified_at: null});
+      return created;
+    });
+    if (site.status === 'provisioning') provisioner.queue(site);
+    return site;
   }
 }

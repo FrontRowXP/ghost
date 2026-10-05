@@ -1,3 +1,4 @@
+const tenantConflictColumns = require('../../lib/gather/conflict-columns');
 import { z } from 'zod';
 import errors from '@tryghost/errors';
 import type { Knex } from 'knex';
@@ -92,7 +93,7 @@ export class GiftLinksService {
   private setLiveLink(trx: Knex.Transaction, postId: string, link: GiftLink) {
     return trx('post_gift_links')
       .insert({ post_id: postId, gift_link_token: link.token, created_at: link.createdAt })
-      .onConflict('post_id')
+      .onConflict(tenantConflictColumns('post_id'))
       .merge({ gift_link_token: link.token, updated_at: link.createdAt });
   }
 }

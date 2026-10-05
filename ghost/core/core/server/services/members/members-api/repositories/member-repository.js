@@ -1,3 +1,4 @@
+const tenantConflictColumns = require('../../../../lib/gather/conflict-columns');
 const _ = require('lodash');
 const errors = require('@tryghost/errors');
 const { ADMIN } = require('../../../members-metafields');
@@ -2136,7 +2137,7 @@ module.exports = class MemberRepository {
 
         await trx('members_current_subscription')
           .insert({ member_id: best.member_id, subscription_id: best.subscription_id })
-          .onConflict('member_id')
+          .onConflict(tenantConflictColumns('member_id'))
           .merge();
       } else {
         // No subscriptions remain — remove the lookup row

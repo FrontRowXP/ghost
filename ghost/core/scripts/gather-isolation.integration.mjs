@@ -9,6 +9,8 @@ const schema = require('../core/server/data/schema/schema');
 const commands = require('../core/server/data/schema/commands');
 const views = require('../core/server/data/schema/views');
 const {installTenantIsolation, verifyTenantDatabase, TENANT_TABLES, tenantRole} = require('../core/server/lib/gather/database');
+const {SiteRegistry} = require('../core/server/lib/gather/registry');
+const {createStaffLogin} = require('../core/server/lib/gather/staff-login');
 const migration = require('../core/server/data/migrations/versions/6.68/2026-10-05-19-39-53-add-shared-publication-tenancy-columns');
 const base = {host: '127.0.0.1', port: 5432, user: 'gather_test', password: 'gather_test', database: 'gather_test'};
 
@@ -94,10 +96,49 @@ test('97 shared tables enforce immutable login isolation, scoped uniqueness, rel
       await assert.rejects(runtime.raw('TRUNCATE tags'), /permission denied/);
       await assert.rejects(runtime.raw('CREATE TABLE escape(id text)'), /permission denied/);
       await assert.rejects(runtime.raw('SET ROLE ??', [controlRole]), /permission denied/);
-      await assert.rejects(runtime('gather_site_staff').select('*'), /permission denied/);
+      assert.deepEqual(await runtime('gather_site_staff'), []);
+      await assert.rejects(runtime('gather_site_staff').insert({id: randomUUID(), site_id: ids[0], subject_id: randomUUID(), staff_id: ownerA.id}), /permission denied/);
       await assert.rejects(runtime.raw('SELECT gather_ensure_runtime_role(?, ?)', [ids[0], password]), /permission denied/);
     }
     await assert.rejects(control('tags').select('*'), /permission denied/);
+    const existing = await control('gather_sites').where({id: ids[0]}).first();
+    const principal = {user: {id: existing.created_by, name: 'Owner'}, workspaces: [{id: existing.workspace_id, name: 'Workspace', role: 'owner'}]};
+    await control('gather_site_staff').insert({id: randomUUID(), site_id: ids[0], subject_id: principal.user.id, staff_id: ownerA.id});
+    await control('gather_site_domains').insert({id: randomUUID(), site_id: ids[0], hostname: 'gather.example.test', verified_at: new Date(), is_primary: true});
+    assert.equal((await a('gather_site_staff')).length, 1);
+    assert.deepEqual(await b('gather_site_staff'), []);
+    const queued = [];
+    const registry = new SiteRegistry(control, {maximumSites: 3, hostname: slug => 'gather-' + slug + '.example.test', queue: site => queued.push(site.id)});
+    const input = {workspaceId: existing.workspace_id, name: 'New publication', slug: 'new-publication'};
+    const created = await registry.create(input, principal);
+    const retried = await registry.create(input, principal);
+    assert.equal(created.id, retried.id);
+    assert.equal((await control('gather_sites').where({slug: input.slug})).length, 1);
+    assert.equal((await registry.browse(principal)).length, 2); // Existing + own preparing site.
+    await assert.rejects(registry.create({...input, slug: 'another'}, principal), error => error.code === 'site_capacity_reached');
+    await assert.rejects(registry.create(input, {...principal, workspaces: [{...principal.workspaces[0], role: 'member'}]}), error => error.code === 'workspace_owner_required');
+    await assert.rejects(registry.create({...input, name: 'Different'}, principal), error => error.code === 'site_address_in_use');
+    const store = () => {
+      const records = new Map();
+      return {async reserve(token) {if (records.has(token)) return false; records.set(token, {}); return true;}, async put(token, value) {records.set(token, value);}, async get(token) {return records.get(token);}, async consume(token) {const value = records.get(token); records.delete(token); return value;}};
+    };
+    const login = createStaffLogin({database: control, registry, flows: store(), grants: store(), hubOrigin: 'https://gather.example.test'});
+    let bindingCookie;
+    let destination;
+    const res = {cookie(name, value, options) {assert.equal(name, '__Host-gather-site-login'); assert.equal(options.path, '/'); bindingCookie = name + '=' + value;}, set() {}, redirect(value) {destination = value;}};
+    await login.start({}, res, ids[0], 'gather.example.test');
+    const flow = new URL(destination).searchParams.get('gatherLogin');
+    assert.equal((await login.read(flow)).name, existing.name);
+    const delegation = {cookie: '__Host-moments_session=' + 'b'.repeat(64), subject: principal.user.id, csrf: 'c'.repeat(64)};
+    await assert.rejects(login.complete(flow, {...principal, workspaces: []}, delegation));
+    const redirect = await login.complete(flow, principal, delegation);
+    assert.ok(!redirect.includes('moments_session'));
+    const req = {query: Object.fromEntries(new URL(redirect).searchParams), get: () => bindingCookie};
+    await assert.rejects(login.consume({...req, get: () => ''}, 'gather.example.test', ids[0]));
+    await assert.rejects(login.consume(req, 'gather-other.example.test', ids[0]));
+    await assert.rejects(login.consume(req, 'gather.example.test', ids[1]));
+    assert.deepEqual(await login.consume(req, 'gather.example.test', ids[0]), delegation);
+    await assert.rejects(login.consume(req, 'gather.example.test', ids[0]));
   } finally {
     await Promise.all(runtimes.map(runtime => runtime.destroy()));
     if (control) await control.destroy();

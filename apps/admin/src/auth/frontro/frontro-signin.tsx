@@ -44,6 +44,11 @@ export default function FrontroSignin({ apiOrigin }: { apiOrigin: string }) {
 
   useEffect(() => {
     active.current = true;
+    if (!site) return () => {active.current = false;};
+    if (site?.site.frontroAuth?.siteSignInUrl) {
+      location.assign(site.site.frontroAuth.siteSignInUrl);
+      return () => { active.current = false; };
+    }
     if (skipAutoConnect.current) {
       sessionStorage.removeItem('frontro-explicit-signout');
       setChecking(false);
@@ -60,7 +65,7 @@ export default function FrontroSignin({ apiOrigin }: { apiOrigin: string }) {
       })
       .finally(() => { if (active.current) setChecking(false); });
     return () => { active.current = false; };
-  }, [apiOrigin, connect]);
+  }, [apiOrigin, connect, Boolean(site), site?.site.frontroAuth?.siteSignInUrl]);
 
   if (checking) return <main className="auth-screen auth-surface"><p role="status">Opening Gather…</p></main>;
   return <>

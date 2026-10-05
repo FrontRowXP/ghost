@@ -34,6 +34,16 @@ test('private NAS delivery enforces origin authentication and public prefixes', 
         assert.equal((await fetchAsset(`${url}/_assets/content/images/x`, {method: 'POST'})).status, 405);
         assert.equal((await fetchAsset(`${url}/_assets/content/images/x`, {headers: {range: 'bytes=1-2,3-4'}})).status, 416);
         assert.equal(calls.length, 1);
+        const site = '12345678-1234-1234-1234-123456789abc';
+        const tenantFile = await fetchAsset(`${url}/_assets/sites/${site}/content/files/example.pdf`);
+        assert.equal(tenantFile.status, 200);
+        assert.equal(tenantFile.headers.get('content-disposition'), 'attachment');
+        await tenantFile.body?.cancel();
+        assert.equal(calls[1].Key, `sites/${site}/content/files/example.pdf`);
+        for (const path of [`sites/${site}/content/settings/routes.yaml`, `sites/${site}/content/imports/private.json`, 'sites/not-a-site/content/images/file.png']) {
+          assert.equal((await fetchAsset(`${url}/_assets/${path}`)).status, 404);
+        }
+        assert.equal(calls.length, 2);
     } finally {
         server.closeAllConnections();
         await new Promise(resolve => server.close(resolve));

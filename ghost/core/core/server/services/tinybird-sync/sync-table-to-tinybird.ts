@@ -1,3 +1,4 @@
+const tenantConflictColumns = require('../../lib/gather/conflict-columns');
 import type { Knex } from 'knex';
 import type { ReadonlyDeep } from 'type-fest';
 import errors from '@tryghost/errors';
@@ -155,7 +156,7 @@ async function writeWatermark(
       ...values,
       created_at: timestamp,
     })
-    .onConflict('table_name')
+    .onConflict(tenantConflictColumns('table_name'))
     .merge(values);
 }
 

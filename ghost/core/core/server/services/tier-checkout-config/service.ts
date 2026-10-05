@@ -1,3 +1,4 @@
+const tenantConflictColumns = require('../../lib/gather/conflict-columns');
 import ObjectID from 'bson-objectid';
 import errors from '@tryghost/errors';
 import { z } from 'zod';
@@ -382,7 +383,7 @@ async function writeOptions(
       updated_at: now,
       ...columns,
     })
-    .onConflict('product_id')
+    .onConflict(tenantConflictColumns('product_id'))
     .merge({ ...columns, updated_at: now });
 }
 

@@ -78,7 +78,18 @@ async function initDatabase({ config }) {
   const dbStateManager = new DatabaseStateManager({
     knexMigratorFilePath: config.get('paths:appRoot'),
   });
-  await dbStateManager.makeReady();
+  if (config.get('gather:tenant:siteId')) {
+    const database = require('./server/data/db').knex;
+    await require('./server/lib/gather/database').verifyTenantDatabase(database, config.get('gather:tenant:siteId'));
+    if (await dbStateManager.getState() !== 0) {
+      throw new Error('A tenant runtime cannot initialize or migrate the shared database');
+    }
+    if (config.get('gather:tenant:bootstrap')) {
+      await require('./server/lib/gather/bootstrap').bootstrapTenant(config, database);
+    }
+  } else {
+    await dbStateManager.makeReady();
+  }
 
   const databaseInfo = require('./server/data/db/info');
   await databaseInfo.init();

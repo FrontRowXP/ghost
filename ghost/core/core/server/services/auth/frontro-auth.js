@@ -32,9 +32,9 @@ function readCookie(headers, name) {
 
 module.exports.publicConfiguration = publicConfiguration;
 module.exports.createFrontroAuth = function createFrontroAuth({
-  getConfig, getAdminOrigin, getAdminPath = () => '/ghost', findUserById, createSession,
+  getConfig, getAdminOrigin, getAdminPath = () => '/ghost', getUpstreamOrigin = getAdminOrigin, findUserById, createSession,
   fetch: request = globalThis.fetch, now = Date.now,
-  handoffStore, bindingCookie = BINDING_COOKIE, acceptIdentity,
+  handoffStore, bindingCookie = BINDING_COOKIE, acceptIdentity, resolveStaff,
 }) {
   // Gather Core is a singleton. A restart intentionally expires pending login
   // attempts; authenticated sessions continue in Ghost's persistent store.
@@ -80,7 +80,7 @@ module.exports.createFrontroAuth = function createFrontroAuth({
         method: body === undefined ? 'GET' : 'POST',
         redirect: 'error', signal: AbortSignal.timeout(8000),
         headers: {
-          Origin: getAdminOrigin(),
+          Origin: getUpstreamOrigin(),
           ...(cookie ? { Cookie: cookie } : {}),
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
           ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
@@ -166,17 +166,23 @@ module.exports.createFrontroAuth = function createFrontroAuth({
       res.set('Cache-Control', 'no-store');
       return res.json({ authenticated: true });
     }
+    return grantStaff(req, res, identity, {cookie, subject, csrf: identity.user.csrfToken});
+  }
+
+  async function grantStaff(req, res, identity, delegation) {
+    const {cookie, subject} = delegation;
     const config = configuration();
-    const staffId = UUID.test(subject) && Object.hasOwn(config.staff || {}, subject) ? config.staff[subject] : null;
+    const staffId = UUID.test(subject) && resolveStaff ? await resolveStaff(subject, identity) :
+      UUID.test(subject) && Object.hasOwn(config.staff || {}, subject) ? config.staff[subject] : null;
     const user = staffId && await findUserById(staffId);
     if (!user || user.get('status') !== 'active') {
-      await revoke({ cookie, csrf: identity?.user?.csrfToken });
+      await revoke(delegation);
       throw failure(403, 'frontro_staff_access_required');
     }
     try {
       // Ghost's own session service rotates the pre-login session identifier.
       await createSession(req, res, user);
-      req.session.frontroSession = { cookie, subject, csrf: identity.user.csrfToken };
+      req.session.frontroSession = delegation;
       await new Promise((resolve, reject) => req.session.save(error => error ? reject(error) : resolve()));
     } catch (error) {
       await revoke({ cookie, csrf: identity?.user?.csrfToken });
@@ -188,13 +194,14 @@ module.exports.createFrontroAuth = function createFrontroAuth({
 
   async function validate(session) {
     const stored = session.frontroSession;
-    if (!stored) return true;
+    if (!stored) return !resolveStaff;
     if (!getConfig()?.enabled) return false;
     const config = configuration();
-    if (!Object.hasOwn(config.staff || {}, stored.subject) || config.staff[stored.subject] !== session.user_id) return false;
+    if (!resolveStaff && (!Object.hasOwn(config.staff || {}, stored.subject) || config.staff[stored.subject] !== session.user_id)) return false;
     try {
       const { data } = await call('/me', { cookie: stored.cookie });
-      return data?.user?.id === stored.subject;
+      if (data?.user?.id !== stored.subject) return false;
+      return !resolveStaff || (await resolveStaff(stored.subject, data)) === session.user_id;
     } catch (error) {
       if (error.statusCode === 401) return false;
       throw error; // Provider outage fails closed without destroying the session.
@@ -212,5 +219,9 @@ module.exports.createFrontroAuth = function createFrontroAuth({
     if (data?.user?.id !== stored.subject) throw failure(401, 'frontro_identity_required');
     return data;
   }
-  return { start, complete, validate, revoke, discard, identity };
+  async function acceptDelegation(req, res, stored) {
+    const verified = await identity(stored);
+    return grantStaff(req, res, verified, stored);
+  }
+  return { start, complete, validate, revoke, discard, identity, acceptDelegation };
 };

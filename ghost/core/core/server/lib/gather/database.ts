@@ -78,9 +78,9 @@ export async function installTenantIsolation(database: Knex, legacySiteId: strin
     // Capture real foreign keys before dropping global semantic uniqueness.
     const foreign = await tx.raw(`SELECT c.conname, source.relname AS source, target.relname AS target,
       c.confdeltype AS deletion, c.condeferrable AS deferred, c.condeferred AS initially_deferred,
-      ARRAY(SELECT a.attname FROM unnest(c.conkey) WITH ORDINALITY k(num,ord)
+      ARRAY(SELECT a.attname::text FROM unnest(c.conkey) WITH ORDINALITY k(num,ord)
         JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.num ORDER BY k.ord) AS columns,
-      ARRAY(SELECT a.attname FROM unnest(c.confkey) WITH ORDINALITY k(num,ord)
+      ARRAY(SELECT a.attname::text FROM unnest(c.confkey) WITH ORDINALITY k(num,ord)
         JOIN pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=k.num ORDER BY k.ord) AS target_columns
       FROM pg_constraint c JOIN pg_class source ON source.oid=c.conrelid
       JOIN pg_class target ON target.oid=c.confrelid JOIN pg_namespace n ON n.oid=source.relnamespace
@@ -93,7 +93,7 @@ export async function installTenantIsolation(database: Knex, legacySiteId: strin
       await tx.raw('ALTER TABLE ??.?? DROP CONSTRAINT ??', [schema, reference.source, reference.conname]);
     }
     const unique = await tx.raw(`SELECT t.relname AS table, i.relname AS name, con.conname, idx.indexprs, idx.indpred,
-      ARRAY(SELECT a.attname FROM unnest(idx.indkey) WITH ORDINALITY k(num,ord)
+      ARRAY(SELECT a.attname::text FROM unnest(idx.indkey) WITH ORDINALITY k(num,ord)
         JOIN pg_attribute a ON a.attrelid=idx.indrelid AND a.attnum=k.num ORDER BY k.ord) AS columns
       FROM pg_index idx JOIN pg_class t ON t.oid=idx.indrelid JOIN pg_class i ON i.oid=idx.indexrelid
       JOIN pg_namespace n ON n.oid=t.relnamespace LEFT JOIN pg_constraint con ON con.conindid=idx.indexrelid
@@ -178,6 +178,13 @@ export async function installTenantIsolation(database: Knex, legacySiteId: strin
       await tx.raw('REVOKE ALL ON ??.?? FROM PUBLIC', [schema, table]);
       await tx.raw('GRANT SELECT, INSERT, UPDATE, DELETE ON ??.?? TO ??', [schema, table, controlRole]);
     }
+    // A tenant may read only its own explicit staff bindings. It cannot issue
+    // or change a binding; control owns grants and runtime auth rechecks it.
+    await tx.raw('ALTER TABLE ??.gather_site_staff ENABLE ROW LEVEL SECURITY', [schema]);
+    await tx.raw('ALTER TABLE ??.gather_site_staff FORCE ROW LEVEL SECURITY', [schema]);
+    await tx.raw('CREATE POLICY gather_staff_tenant ON ??.gather_site_staff FOR SELECT USING (site_id = ??.gather_current_site())', [schema, schema]);
+    await tx.raw('CREATE POLICY gather_staff_control ON ??.gather_site_staff TO ?? USING (true) WITH CHECK (true)', [schema, controlRole]);
+    await tx.raw('CREATE POLICY gather_staff_maintenance ON ??.gather_site_staff TO ?? USING (true) WITH CHECK (true)', [schema, owner]);
     await tx.raw('GRANT USAGE ON SCHEMA ?? TO ??', [schema, controlRole]);
     // Only this constrained function can create runtime identities. Control has
     // no CREATE ROLE, database ownership, RLS bypass, or publication write grant.
@@ -209,6 +216,7 @@ export async function installTenantIsolation(database: Knex, legacySiteId: strin
         FOR table_name IN SELECT tablename FROM pg_tables WHERE schemaname='${schemaLiteral}' AND tablename IN ('migrations','migrations_lock','gather_tenancy_state') LOOP
           EXECUTE format('GRANT SELECT ON %I.%I TO %I', '${schemaLiteral}', table_name, role_name);
         END LOOP;
+        EXECUTE format('GRANT SELECT ON %I.gather_site_staff TO %I', '${schemaLiteral}', role_name);
         EXECUTE format('GRANT SELECT ON %I.members_resolved_subscription TO %I', '${schemaLiteral}', role_name);
       END $body$`, [schema, schema]);
     await tx.raw('REVOKE ALL ON FUNCTION ??.gather_ensure_runtime_role(text,text) FROM PUBLIC', [schema]);

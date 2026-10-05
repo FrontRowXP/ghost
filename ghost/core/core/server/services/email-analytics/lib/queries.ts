@@ -1,3 +1,4 @@
+const tenantConflictColumns = require('../../../lib/gather/conflict-columns');
 import _ from 'lodash';
 import debugFactory from '@tryghost/debug';
 import logging from '@tryghost/logging';
@@ -39,7 +40,7 @@ async function createJobIfNotExists(knex: Knex, jobName: EmailAnalyticsJobName):
       created_at: new Date(),
       status: 'started',
     })
-    .onConflict('name')
+    .onConflict(tenantConflictColumns('name'))
     .ignore();
 }
 

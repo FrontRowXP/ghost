@@ -60,3 +60,28 @@ it('reports a staff access denial without treating it as sign-in success', async
   await expect.element(page.getByRole('alert')).toHaveTextContent(/does not have access/);
   expect(vi.mocked(reloadAdmin)).not.toHaveBeenCalled();
 });
+
+it('retries a throttled staff handoff without submitting an already consumed email code', async () => {
+  fakeEndpoint('GET', apiOrigin + '/v1/me', { code: 'authentication_required' }, { status: 401 });
+  fakeEndpoint('POST', apiOrigin + '/v1/auth/challenges', { challengeId: 'fixture', retryAfter: 0 });
+  const verification = fakeEndpoint('POST', apiOrigin + '/v1/auth/challenges/fixture/verify', { authenticated: true });
+  await renderAdminApp('/signin', boot());
+  await expect.element(page.getByLabelText('Phone or Email')).toBeVisible();
+  await page.getByLabelText('Phone or Email').fill('owner@example.test');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect.element(page.getByLabelText('Verification code')).toBeVisible();
+  fakeEndpoint('GET', apiOrigin + '/v1/me', { user: { id: handoffId, csrfToken: 'fixture-csrf' } });
+  fakeAdminEndpoint('POST', '/authentication/frontro/start/',
+    { errors: [{ message: 'frontro_auth_unavailable' }] }, { status: 429 });
+  await page.getByLabelText('Verification code').fill('123456');
+  await page.getByRole('button', { name: 'Verify and continue' }).click();
+  await expect.element(page.getByRole('alert')).toHaveTextContent(/Too many attempts/);
+  await expect.element(page.getByRole('heading', { name: 'Finish signing in' })).toBeVisible();
+  expect(verification.requests).toHaveLength(1);
+  fakeAdminEndpoint('POST', '/authentication/frontro/start/', { id: handoffId, code: 'ABCD1234' });
+  fakeEndpoint('POST', apiOrigin + '/v1/auth/handoffs/' + handoffId + '/approve', {});
+  fakeAdminEndpoint('POST', '/authentication/frontro/complete/', { authenticated: true });
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect.poll(() => vi.mocked(reloadAdmin).mock.calls).toEqual([['/']]);
+  expect(verification.requests).toHaveLength(1);
+});

@@ -79,7 +79,7 @@ const sessionService = createSessionService({
 const frontroAuth = createFrontroAuth({
   getConfig: () => config.get('security:frontroAuth'),
   getAdminOrigin: () => new URL(urlUtils.getAdminUrl() || urlUtils.getSiteUrl()).origin,
-  getSession: expressSession.getSession,
+  getAdminPath: () => urlUtils.getSubdir() + '/ghost',
   findUserById: id => models.User.findOne({ id, status: 'active' }),
   createSession: sessionService.createVerifiedSessionForUser,
 });
@@ -98,7 +98,7 @@ sessionService.removeUserForSession = async (req, res) => {
   const session = await expressSession.getSession(req, res);
   const upstream = session.frontroSession;
   delete session.frontroSession;
-  delete session.frontroHandoff;
+  frontroAuth.discard(req, res);
   await removeUserForSession(req, res);
   await frontroAuth.revoke(upstream);
 };

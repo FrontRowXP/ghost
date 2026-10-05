@@ -10,7 +10,7 @@ const messages = {
 
 const { TABLES_ALLOWLIST, SETTING_KEYS_BLOCKLIST, PLATFORM_TABLES } = require('./table-lists');
 
-const exportTable = function exportTable(tableName, options) {
+const exportTable = async function exportTable(tableName, options) {
   if (PLATFORM_TABLES.includes(tableName)) return;
   if (
     TABLES_ALLOWLIST.includes(tableName) ||
@@ -18,7 +18,13 @@ const exportTable = function exportTable(tableName, options) {
   ) {
     const query = (options.transacting || db.knex)(tableName);
 
-    return query.select();
+    const rows = await query.select();
+    // Site identity is server authority, never publication export/import data.
+    return rows.map((record) => {
+      const row = { ...record };
+      delete row.site_id;
+      return row;
+    });
   }
 };
 

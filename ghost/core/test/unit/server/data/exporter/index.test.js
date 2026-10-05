@@ -24,7 +24,7 @@ describe('Exporter', function () {
 
       queryMock = {
         whereNot: sinon.stub(),
-        select: sinon.stub(),
+        select: sinon.stub().resolves([]),
       };
 
       knexMock = sinon.stub().returns(queryMock);
@@ -137,6 +137,14 @@ describe('Exporter', function () {
         assert.equal(knexMock.getCalls().some(call => call.args[0] === table), false);
         assert.equal(result.data[table], undefined);
       }
+    });
+
+    it('strips server-assigned site authority from publication rows without mutating them', async function () {
+      const record = {id: 'fixture', site_id: 'private-site', title: 'Exported title'};
+      queryMock.select.resolves([record]);
+      const result = await exporter.doExport();
+      assert.deepEqual(result.data.posts, [{id: 'fixture', title: 'Exported title'}]);
+      assert.equal(record.site_id, 'private-site');
     });
   });
 

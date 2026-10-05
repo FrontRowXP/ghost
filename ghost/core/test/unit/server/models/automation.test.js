@@ -8,6 +8,16 @@ describe('Unit: models/automation', function () {
     sinon.restore();
   });
 
+  it('builds the default ordering for both PostgreSQL and MySQL without dialect-specific raw identifiers', function () {
+    const knex = require('knex');
+    for (const client of ['pg', 'mysql2']) {
+      const database = knex({client});
+      const sql = database('automations').select('id').orderByRaw(Automation.orderDefaultRaw()).toSQL().sql;
+      assert.match(sql, /order by created_at ASC$/);
+      if (client === 'pg') assert.doesNotMatch(sql, /`/);
+    }
+  });
+
   describe('defaults', function () {
     it('sets default status to inactive', function () {
       const model = new Automation();

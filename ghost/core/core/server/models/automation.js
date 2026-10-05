@@ -57,7 +57,7 @@ const Automation = ghostBookshelf.Model.extend(
   },
   {
     orderDefaultRaw() {
-      return '`created_at` ASC';
+      return 'created_at ASC';
     },
   },
 );

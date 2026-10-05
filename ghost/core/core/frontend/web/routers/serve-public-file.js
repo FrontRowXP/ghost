@@ -206,6 +206,17 @@ function servePublicFiles(siteApp) {
     );
   }
 
+  // Release-managed Frontro assets, with a fixed allow-list (no arbitrary paths).
+  for (const [file, mime] of [
+    ['frontro/icon.svg', 'image/svg+xml'],
+    ['frontro/logo.svg', 'image/svg+xml'],
+    ['frontro/icon.png', 'image/png'],
+    ['gather-portal/portal.min.js', 'application/javascript'],
+    ['gather-toolbar/admin-toolbar.min.js', 'application/javascript'],
+  ]) {
+    siteApp.get(`/public/${file}`, createPublicFileMiddleware('static', `public/${file}`, mime, 60));
+  }
+
   // Card assets (assembled in memory per active theme)
   siteApp.get(
     '/public/cards.min.css',

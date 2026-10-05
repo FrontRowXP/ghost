@@ -9,9 +9,9 @@ import ghostProLogoDark from '@/assets/images/ghost-pro-logo-dark.png';
 const DAYS_PLACEHOLDER = '{{days}}';
 
 const DEFAULT_TITLE = 'Unlock every feature';
-const DEFAULT_MESSAGE = `Choose a plan to access the full power of Ghost right away, you have ${DAYS_PLACEHOLDER} free trial remaining.`;
+const DEFAULT_MESSAGE = `Choose a plan to access the full power of Frontro right away, you have ${DAYS_PLACEHOLDER} free trial remaining.`;
 const DEFAULT_UPGRADE_URL = '#/pro/billing/plans';
-const DEFAULT_LOGO_ALT = 'Ghost Pro';
+const DEFAULT_LOGO_ALT = 'Frontro';
 
 function UpgradeBanner({ trialDaysRemaining }: { trialDaysRemaining: number }) {
   const { data: config } = useBrowseConfig();

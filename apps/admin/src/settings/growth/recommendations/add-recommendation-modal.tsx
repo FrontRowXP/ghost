@@ -225,7 +225,7 @@ const AddRecommendationModal: React.FC = () => {
     >
       <p className="mt-4">
         You can recommend <strong>any site</strong> your audience will find valuable, not just those
-        published on Ghost.
+        that support one-click subscriptions.
       </p>
       <FieldGroup className="mt-10 gap-8">
         <Field data-invalid={Boolean(errors.url) || undefined}>

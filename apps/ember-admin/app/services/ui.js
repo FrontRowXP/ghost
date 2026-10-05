@@ -96,7 +96,7 @@ export default class UiService extends Service {
 
         const blogTitle = this.config.blogTitle;
 
-        window.document.title = `Ghost Admin - ${blogTitle}`;
+        window.document.title = `Frontro Admin - ${blogTitle}`;
     }
 
     @action

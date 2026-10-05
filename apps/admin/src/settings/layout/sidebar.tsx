@@ -1,4 +1,4 @@
-import GhostLogo from '@/settings/assets/images/orb-pink.png';
+import GhostLogo from '@/assets/img/frontro-icon.svg';
 import React, { useEffect, useRef } from 'react';
 import clsx from 'clsx';
 import {
@@ -494,7 +494,7 @@ const Sidebar: React.FC = () => {
             icon={<LucideIcon.Globe />}
             keywords={growthSearchKeywords.explore}
             navid="explore"
-            title="Ghost Explore"
+            title="Discover publishers"
             onClick={handleSectionClick}
           />
           <NavItem
@@ -577,8 +577,8 @@ const Sidebar: React.FC = () => {
               updateRoute('about');
             }}
           >
-            <img alt="Ghost Logo" className="mr-[7px] size-[18px]" src={GhostLogo} />
-            About Ghost
+            <img alt="Frontro Logo" className="mr-[7px] size-[18px]" src={GhostLogo} />
+            About Frontro
           </a>
         )}
       </nav>

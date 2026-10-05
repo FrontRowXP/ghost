@@ -454,7 +454,7 @@ module.exports = function createSessionService({
     try {
       await mailer.send({
         to: recipient,
-        subject: `${token} is your Ghost sign in verification code`,
+        subject: `${token} is your Frontro sign in verification code`,
         html: email,
       });
     } catch (error) {

@@ -57,7 +57,7 @@ export function OnboardingChecklist({
             <span className="flex min-w-0 items-center opacity-20">
               <LucideIcon.Rocket className="mr-4 size-5 shrink-0 text-purple" />
               <span className="truncate pr-8 text-[16px] leading-[1.3] font-bold text-foreground">
-                Start a new Ghost publication
+                Start a new Frontro publication
               </span>
             </span>
             <span className="shrink-0 text-green">

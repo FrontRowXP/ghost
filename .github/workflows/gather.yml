@@ -53,6 +53,14 @@ jobs:
         run: python3 -m unittest discover -s infra/deployer -p 'test_*.py'
       - name: Build the bundled public search frontend
         run: pnpm --filter @tryghost/sodo-search run build
+      - name: Build and qualify Frontro public branding
+        run: |
+          pnpm --filter @tryghost/portal run build
+          pnpm --filter @tryghost/admin-toolbar run build
+          node --test ghost/core/scripts/frontro-branding.test.mjs
+          pnpm --filter @tryghost/portal exec vitest run test/portal-links.test.jsx
+          pnpm --filter @tryghost/admin-toolbar exec vitest run test/admin-toolbar.test.js
+          pnpm --filter ghost exec vitest run test/unit/frontend/utils/frontend-apps.test.ts test/unit/frontend/helpers/ghost-head.test.js test/unit/frontend/services/rss/generate-feed.test.js test/unit/server/services/mail/ghost-mailer.test.js test/unit/server/services/auth/session/session-service.test.js --maxWorkers=2
       - name: Reject inherited publication workflows
         run: |
           unexpected=$(find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) ! -name gather.yml)

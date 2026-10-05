@@ -165,7 +165,7 @@ const milestoneEmailConfig = (siteTitle, formattedValue) => {
         heading: 'Celebrating 250k member signups',
         content: [
           `One-quarter of a million people enjoy and support <strong>${siteTitle}</strong>. That’s the same number of people who make up the crowds at the SXSW festival.`,
-          'You’re officially in the top 5% of creators using Ghost 🚀',
+          'Your publication has reached an incredible milestone 🚀',
           'Reaching this milestone is no easy feat, so make sure you take some time to recognize how far you’ve come.',
           'Keep up the amazing work!',
         ],
@@ -179,7 +179,7 @@ const milestoneEmailConfig = (siteTitle, formattedValue) => {
         heading: `Half a million members!`,
         content: [
           `Congrats, <strong>${siteTitle}</strong> has officially attracted an audience of more than <strong>${formattedValue} people</strong>, and counting.`,
-          'You’re officially in the top 3% of creators using Ghost. ',
+          'Your publication has reached an incredible milestone. ',
           'It takes a huge amount of hard work and dedication to build an audience of this size. It is a testament to how much value your work is providing to thousands of people all over the world. Keep up the great work, and make sure to take the time to celebrate this incredible milestone.',
         ],
         ctaText: 'Login to your dashboard',
@@ -191,7 +191,7 @@ const milestoneEmailConfig = (siteTitle, formattedValue) => {
         subject: `${siteTitle} has 1 million members`,
         heading: `You did it. 1 million members 🏆`,
         content: [
-          `Start writing your acceptance speech! The <strong>${siteTitle}</strong> audience is now officially big enough to headline an event at the Copacabana, with more than <strong>1 million members</strong>. That puts you in the top 1% of creators using Ghost.`,
+          `Start writing your acceptance speech! The <strong>${siteTitle}</strong> audience is now officially big enough to headline an event at the Copacabana, with more than <strong>1 million members</strong>.`,
           'In all seriousness, this is an <em>incredible</em> achievement and something to be very proud of. You deserve all the credit as a truly independent creator.',
           'Keep it up, you’re creating amazing value in the world!',
         ],

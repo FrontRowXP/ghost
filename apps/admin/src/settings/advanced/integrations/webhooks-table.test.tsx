@@ -26,7 +26,7 @@ describe('WebhooksTable', () => {
 
     expect(screen.getByRole('heading', { name: 'No webhooks' })).toBeInTheDocument();
     expect(
-      screen.getByText('Add a webhook to send Ghost events to another service.'),
+      screen.getByText('Add a webhook to send Frontro events to another service.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add webhook' })).toHaveClass(
       'border-control-border',

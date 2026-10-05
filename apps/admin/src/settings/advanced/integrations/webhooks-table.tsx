@@ -79,7 +79,7 @@ const WebhooksTable: React.FC<{ integration: Integration }> = ({ integration }) 
             </Button>
           }
           className="py-8"
-          description="Add a webhook to send Ghost events to another service."
+          description="Add a webhook to send Frontro events to another service."
           title="No webhooks"
         >
           <LucideIcon.Webhook />

@@ -70,10 +70,10 @@ function toAuthError(
 /** The text for a failure that never produced an AuthError, falling back to the caller's own. */
 export function describeUnexpectedError(error: unknown, fallback: string): string {
   if (error instanceof VersionMismatchError) {
-    return 'Ghost has been upgraded, please copy any unsaved data and refresh the page to continue.';
+    return 'Frontro has been upgraded, please copy any unsaved data and refresh the page to continue.';
   }
   if (error instanceof MaintenanceError) {
-    return 'Sorry, Ghost is currently undergoing maintenance, please wait a moment then try again.';
+    return 'Sorry, Frontro is currently undergoing maintenance, please wait a moment then try again.';
   }
   return fallback;
 }

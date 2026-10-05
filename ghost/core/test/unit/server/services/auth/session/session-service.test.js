@@ -796,7 +796,7 @@ describe('SessionService', function () {
     sinon.assert.calledOnce(mailer.send);
     const emailArgs = mailer.send.firstCall.args[0];
     assert.equal(emailArgs.to, 'test@example.com');
-    assert.match(emailArgs.subject, /Ghost sign in verification code/);
+    assert.match(emailArgs.subject, /Frontro sign in verification code/);
   });
 
   it('throws an error when mail fails to send', async function () {

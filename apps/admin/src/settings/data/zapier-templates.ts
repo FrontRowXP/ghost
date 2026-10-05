@@ -1,11 +1,11 @@
 import { type ZapierTemplate } from '@/settings/advanced/integrations/zapier-modal';
 
 // Ghost logo images
-import OrbBlack1 from '@/settings/assets/images/logos/orb-black-1.png';
-import OrbBlack2 from '@/settings/assets/images/logos/orb-black-2.png';
-import OrbBlack3 from '@/settings/assets/images/logos/orb-black-3.png';
-import OrbBlack4 from '@/settings/assets/images/logos/orb-black-4.png';
-import OrbBlack5 from '@/settings/assets/images/logos/orb-black-5.png';
+import OrbBlack1 from '@/assets/img/frontro-icon.svg';
+import OrbBlack2 from '@/assets/img/frontro-icon.svg';
+import OrbBlack3 from '@/assets/img/frontro-icon.svg';
+import OrbBlack4 from '@/assets/img/frontro-icon.svg';
+import OrbBlack5 from '@/assets/img/frontro-icon.svg';
 
 // Integration app images
 import GoogleDocsIcon from '@/settings/assets/images/integrations/google-docs.svg';
@@ -26,7 +26,7 @@ export const zapierTemplates: ZapierTemplate[] = [
   {
     ghostImage: OrbBlack3,
     appImage: PatreonIcon,
-    title: 'Connect Patreon to your Ghost membership site',
+    title: 'Connect Patreon to your Frontro membership site',
     url: 'https://zapier.com/webintent/create-zap?template=75801',
   },
   {
@@ -50,7 +50,7 @@ export const zapierTemplates: ZapierTemplate[] = [
   {
     ghostImage: OrbBlack1,
     appImage: GoogleDocsIcon,
-    title: 'Send new post drafts from Google Docs to Ghost',
+    title: 'Send new post drafts from Google Docs to Frontro',
     url: 'https://zapier.com/webintent/create-zap?template=50924',
   },
   {
@@ -62,7 +62,7 @@ export const zapierTemplates: ZapierTemplate[] = [
   {
     ghostImage: OrbBlack1,
     appImage: MailchimpIcon,
-    title: 'Sync email subscribers in Ghost + Mailchimp',
+    title: 'Sync email subscribers in Frontro + Mailchimp',
     url: 'https://zapier.com/webintent/create-zap?template=359342',
   },
 ];

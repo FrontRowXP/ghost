@@ -93,7 +93,7 @@ function RecommendationDescriptionForm<T extends EditOrAddRecommendation>({
         </div>
         {formState.one_click_subscribe && (
           <FieldDescription className="mt-1">
-            This is a Ghost site, so your readers can subscribe with just one click
+            Your readers can subscribe to this site with just one click
           </FieldDescription>
         )}
       </div>

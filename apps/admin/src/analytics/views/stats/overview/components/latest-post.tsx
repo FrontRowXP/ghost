@@ -72,7 +72,7 @@ const LatestPost: React.FC<LatestPostProps> = ({ latestPostStats, isLoading }) =
   // Get site title from settings or site data
   const siteTitle =
     site.title ||
-    String(settings.find((setting) => setting.key === 'title')?.value || 'Ghost Site');
+    String(settings.find((setting) => setting.key === 'title')?.value || 'Frontro Site');
 
   const siteTimezone = getSiteTimezone(settings);
 

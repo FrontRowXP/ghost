@@ -106,11 +106,11 @@ function PinturaModal() {
           <div className="mb-7 flex flex-col items-stretch justify-between gap-4 rounded-sm bg-gray-50 p-4 md:flex-row md:p-7 dark:bg-gray-950">
             <div className="md:basis-1/2">
               <p className="mb-4 text-md font-semibold">
-                Add advanced image editing to Ghost, with Pintura
+                Add advanced image editing to Frontro, with Pintura
               </p>
               <p className="mb-4">
                 Pintura is a powerful JavaScript image editor that allows you to crop, rotate,
-                annotate and modify images directly inside Ghost.
+                annotate and modify images directly inside Frontro.
               </p>
               <p>
                 Try a demo, purchase a license, and download the required CSS/JS files from
@@ -149,7 +149,7 @@ function PinturaModal() {
                   >
                     Pintura
                   </a>{' '}
-                  for editing your images in Ghost
+                  for editing your images in Frontro
                 </FieldDescription>
               </FieldContent>
               <Switch checked={enabled} id="pintura-enabled" onCheckedChange={setEnabled} />

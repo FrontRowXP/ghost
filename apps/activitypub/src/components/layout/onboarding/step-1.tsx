@@ -43,7 +43,7 @@ const Step1: React.FC = () => {
             </h1>
             <div className="flex max-w-[600px] flex-col gap-4">
               <p className="text-gray-800 dark:text-gray-600">
-                In addition to your website, email newsletter and RSS feeds, Ghost now shares posts
+                In addition to your website, email newsletter and RSS feeds, Frontro now shares posts
                 to the social web – so millions of users across Flipboard, Mastodon, Threads,
                 Bluesky and WordPress can find & follow your work.
               </p>

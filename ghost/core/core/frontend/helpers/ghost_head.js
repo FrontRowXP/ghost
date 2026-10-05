@@ -252,7 +252,7 @@ function getAdminToolbarHelper(dataRoot, siteTitle, excludeList) {
 
   const attrs = {
     'ghost-admin-toolbar': escapeExpression(urlUtils.urlFor('admin', true)),
-    'site-title': escapeExpression(siteTitle || settingsCache.get('title') || 'Ghost'),
+    'site-title': escapeExpression(siteTitle || settingsCache.get('title') || 'Frontro'),
     'resource-type': resourceType || undefined,
     'resource-id': resourceId ? escapeExpression(resourceId) : undefined,
     'resource-slug': resourceSlug ? escapeExpression(resourceSlug) : undefined,
@@ -452,7 +452,7 @@ module.exports = async function ghost_head(options) {
         }
       }
     }
-    head.push('<meta name="generator" content="Ghost ' + escapeExpression(safeVersion) + '">');
+    head.push('<meta name="generator" content="Frontro ' + escapeExpression(safeVersion) + '">');
     head.push(
       '<link rel="alternate" type="application/rss+xml" title="' +
         escapeExpression(meta.site.title) +

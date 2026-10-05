@@ -157,7 +157,7 @@ function renderCompletionEmail(
   </head>
   <body style="background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #3A464C; margin: 0; padding: 0;">
     <div style="box-sizing: border-box; margin: 0 auto; max-width: 540px; padding: 40px 20px;">
-      <img src="https://static.ghost.org/v4.0.0/images/ghost-orb-4.png" width="60" height="60" alt="Ghost" style="display: block; margin: 0 auto 40px;" />
+      <img src="https://gather.frontro.com/public/frontro/icon.png" width="60" height="60" alt="Frontro" style="display: block; margin: 0 auto 40px;" />
       <h1 style="color: #15212A; font-size: 21px; line-height: 25px; margin: 0 0 24px;">${heading}</h1>
       ${failureCopy}
       <p style="font-size: 16px; line-height: 25px; color: #3A464C;">The import processed ${formatNumber(run.total)} ${run.total === 1 ? 'row' : 'rows'}:</p>

@@ -99,7 +99,7 @@ describe('RSS: Generate Feed', function () {
         xmlData,
         /<image><url>http:\/\/my-ghost-blog.com\/favicon.png<\/url><title>Test Title<\/title><link>http:\/\/my-ghost-blog.com\/<\/link><\/image>/,
       );
-      assert.match(xmlData, /<generator>Ghost 0.6<\/generator>/);
+      assert.match(xmlData, /<generator>Frontro 0.6<\/generator>/);
       assert.match(xmlData, /<lastBuildDate>.*?<\/lastBuildDate>/);
       assert.match(xmlData, /<atom:link href="http:\/\/my-ghost-blog.com\/rss\/" rel="self"/);
       assert.match(xmlData, /type="application\/rss\+xml"\/><ttl>60<\/ttl>/);

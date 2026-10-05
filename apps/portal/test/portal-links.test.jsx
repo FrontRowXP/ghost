@@ -253,7 +253,7 @@ describe('Portal Data links:', () => {
       expect(popupFrame).toBeInTheDocument();
       const shareTitle = within(popupFrame.contentDocument).queryByText(/^Share$/i);
       expect(shareTitle).toBeInTheDocument();
-      const poweredBy = within(popupFrame.contentDocument).queryByText(/Powered by Ghost/i);
+      const poweredBy = within(popupFrame.contentDocument).queryByText(/Powered by Frontro/i);
       expect(poweredBy).not.toBeInTheDocument();
     });
   });

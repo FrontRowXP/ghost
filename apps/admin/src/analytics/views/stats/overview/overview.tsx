@@ -266,8 +266,8 @@ const Overview: React.FC = () => {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <H3 className="mt-4 -mb-4 lg:col-span-2">Grow your audience</H3>
           <HelpCard
-            description="Find out how to review the performance of your content and get the most out of post analytics in Ghost."
-            title="Understanding analytics in Ghost"
+            description="Find out how to review the performance of your content and get the most out of post analytics in Frontro."
+            title="Understanding analytics in Frontro"
             url="https://ghost.org/help/native-analytics"
           >
             <div className="flex h-18 w-[100px] min-w-[100px] items-center justify-center rounded-md bg-gradient-to-tr from-[#14B8FF]/20 to-[#00BBA7]/20 p-4 opacity-80 transition-all group-hover/card:opacity-100">

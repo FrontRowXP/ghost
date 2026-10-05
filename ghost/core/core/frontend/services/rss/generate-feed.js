@@ -116,7 +116,7 @@ const generateFeed = function generateFeed(baseUrl, data) {
   const feed = new RSS({
     title: data.title,
     description: data.description,
-    generator: 'Ghost ' + data.safeVersion,
+    generator: 'Frontro ' + data.safeVersion,
     feed_url: urlUtils.urlFor({ relativeUrl: baseUrl }, true),
     site_url: urlUtils.urlFor('home', true),
     image_url: urlUtils.urlFor({ relativeUrl: 'favicon.png' }, true),

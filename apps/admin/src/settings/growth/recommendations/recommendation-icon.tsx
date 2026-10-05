@@ -1,5 +1,4 @@
 /* eslint-disable camelcase */
-import GhostLogo from '@/settings/assets/images/ghost-favicon.png';
 import React, { useState } from 'react';
 
 interface Props {
@@ -20,17 +19,13 @@ const RecommendationIcon: React.FC<Props> = ({ title, favicon, featured_image, i
     return <div className="relative size-6 shrink-0 rounded-sm"></div>;
   }
 
-  const hint = isGhostSite ? 'This is a Ghost site that supports one-click subscribe' : '';
+  const hint = isGhostSite ? 'This site supports one-click subscribe' : '';
 
   return (
     <div className="relative size-6 shrink-0 rounded-sm" title={hint}>
       <img alt={title} className="size-6 rounded-sm" src={icon} onError={clearIcon} />
       {isGhostSite && (
-        <img
-          alt="Ghost Logo"
-          className="absolute right-[-3px] bottom-[-3px] size-[14px]"
-          src={GhostLogo}
-        />
+        <span aria-label="Supports one-click subscribe" className="text-xs">✓</span>
       )}
     </div>
   );

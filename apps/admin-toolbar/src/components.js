@@ -114,7 +114,7 @@ function UserAvatar({ adminUrl, siteTitle, user }) {
     {
       className: 'gh-admin-toolbar-user',
       href: adminHref(adminUrl, ''),
-      'aria-label': `Open Ghost Admin for ${userLabel} on ${siteTitle}`,
+      'aria-label': `Open Frontro Admin for ${userLabel} on ${siteTitle}`,
     },
     [
       h('span', { className: 'gh-admin-toolbar-avatar', 'aria-hidden': 'true' }, [

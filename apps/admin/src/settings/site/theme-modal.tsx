@@ -235,7 +235,7 @@ const ThemeToolbar: React.FC<ThemeToolbarProps> = ({ currentTab, setCurrentTab, 
         prompt: uploadConfig.error || (
           <>
             Your current plan only supports official themes. You can install them from the{' '}
-            <a href="https://ghost.org/marketplace/">Ghost theme marketplace</a>.
+            <a href="https://ghost.org/marketplace/">theme marketplace</a>.
           </>
         ),
         onOk: () => updateRoute({ route: upgradeRoute, isExternal: true }),

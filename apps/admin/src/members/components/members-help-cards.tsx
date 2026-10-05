@@ -38,7 +38,7 @@ const MembersHelpCards: React.FC = () => {
   return (
     <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
       <MembersHelpCard
-        description="Learn how to turn anonymous visitors into logged-in members with memberships in Ghost."
+        description="Learn how to turn anonymous visitors into logged-in members with memberships in Frontro."
         title="Building your audience with subscriber signups"
         url="https://ghost.org/resources/build-audience-subscriber-signups/"
       >

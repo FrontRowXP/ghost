@@ -129,7 +129,7 @@ const PublicationLanguage: React.FC<{ keywords: string[] }> = ({ keywords }) => 
         target="_blank"
       >
         {' '}
-        using Ghost in other languages
+        using Frontro in other languages
       </a>
     </>
   );

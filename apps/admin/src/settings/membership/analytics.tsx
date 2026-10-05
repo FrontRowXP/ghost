@@ -121,7 +121,7 @@ const Analytics: React.FC<{ keywords: string[] }> = ({ keywords }) => {
         <div className="mb-5 rounded-md border border-gray-200 bg-gray-50 px-4 py-2.5 dark:border-gray-900 dark:bg-gray-900">
           <span className="flex items-start gap-2">
             <span>
-              Web analytics in Ghost is powered by{' '}
+              Web analytics in Frontro is powered by{' '}
               <a
                 className="font-medium text-green"
                 href="https://tbrd.co/ghost"

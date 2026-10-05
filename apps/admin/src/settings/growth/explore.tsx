@@ -1,6 +1,6 @@
 import FakeLogo from '@/settings/assets/images/explore-default-logo.png';
 import React, { useEffect, useState } from 'react';
-import SettingImg from '@/settings/assets/images/ghost-explore.png';
+import SettingImg from '@/assets/img/frontro-icon.svg';
 import TopLevelGroup from '@/settings/components/top-level-group';
 import useSettingGroup from '@/settings/hooks/use-setting-group';
 import { Button } from '@tryghost/shade/components';
@@ -76,17 +76,17 @@ const Explore: React.FC<{ keywords: string[] }> = ({ keywords }) => {
     <TopLevelGroup
       customButtons={
         <Switch
-          aria-label="Ghost Explore"
+          aria-label="Publisher directory"
           checked={exploreEnabled}
           data-testid="explore-toggle"
           onCheckedChange={(checked) => void toggleSetting('explore_ping', checked)}
         />
       }
-      description={`Promote your site across Ghost's website and publishing network`}
+      description={`Promote your site across the publishing network`}
       keywords={keywords}
       navid="explore"
       testId="explore"
-      title="Ghost Explore"
+      title="Publisher directory"
     >
       {exploreEnabled ? (
         <SettingGroupContent columns={1}>
@@ -98,7 +98,7 @@ const Explore: React.FC<{ keywords: string[] }> = ({ keywords }) => {
               </FieldLabel>
               <FieldDescription>
                 Enabling this will use your revenue/member growth data to rank your site more highly
-                on Ghost Explore. Total member count will be displayed publicly, other data will be
+                on Publisher directory. Total member count will be displayed publicly, other data will be
                 kept private.
               </FieldDescription>
             </FieldContent>
@@ -163,7 +163,7 @@ const Explore: React.FC<{ keywords: string[] }> = ({ keywords }) => {
           </div>
           <div className="-mx-5 -mb-5 flex items-center justify-between gap-4 rounded-b-xl border-t border-[rgba(142,66,255,0.1)] bg-gradient-to-tr from-[rgba(142,66,255,0.07)] to-[rgba(142,66,255,0.02)] p-6 px-7 md:-mx-7 md:-mb-7">
             <div className="flex flex-col">
-              <span className="font-medium">Get featured on the Ghost.org homepage</span>
+              <span className="font-medium">Get featured in the publisher directory</span>
               <span className="text-pretty text-black/80 dark:text-white/80">
                 Send us a quote we can use to highlight your site
               </span>
@@ -188,4 +188,4 @@ const Explore: React.FC<{ keywords: string[] }> = ({ keywords }) => {
   );
 };
 
-export default withErrorBoundary(Explore, 'Ghost Explore');
+export default withErrorBoundary(Explore, 'Publisher directory');

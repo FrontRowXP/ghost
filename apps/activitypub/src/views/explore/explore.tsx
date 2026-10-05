@@ -177,7 +177,7 @@ const Explore: React.FC = () => {
               The fastest way to grow your followers, is to follow others!
             </H4>
             <p className="text-sm text-balance text-black/60 2xl:text-pretty dark:text-white/60">
-              Here are some recommendations to get you started, from Ghost publishers and other
+              Here are some recommendations to get you started, from publishers and other
               great accounts from around the social web.
             </p>
           </div>

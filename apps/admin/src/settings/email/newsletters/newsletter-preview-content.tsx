@@ -309,7 +309,7 @@ const NewsletterPreviewContent: React.FC<{
                 <p className="mb-[52px]" style={{ color: textColor }}>
                   Email templates are exceptionally finnicky to make, but we&apos;ve spent a long
                   time optimising this one to make it work beautifully across devices, email clients
-                  and content types. So, you can trust that every email you send with Ghost will
+                  and content types. So, you can trust that every email you send with Frontro will
                   look great and work well. Just like the rest of your site.
                 </p>
                 <hr
@@ -640,11 +640,11 @@ const NewsletterPreviewContent: React.FC<{
                   <div className="flex flex-col items-center pt-[10px] pb-[40px]">
                     <a
                       className="pointer-events-none inline-flex cursor-auto items-center px-2 py-1 text-[1.25rem] font-semibold tracking-tight text-gray-900"
-                      href="https://ghost.org"
+                      href="https://frontro.com"
                       style={{ color: textColor }}
                     >
                       <GhostOrb className="mr-[6px] size-4" />
-                      <span>Powered by Ghost</span>
+                      <span>Powered by Frontro</span>
                     </a>
                   </div>
                 )}

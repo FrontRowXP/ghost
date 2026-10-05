@@ -82,7 +82,7 @@ function ZapierModal() {
             rel="noopener noreferrer"
             target="_blank"
           >
-            View more Ghost integrations powered by{' '}
+            View more integrations powered by{' '}
             <span>
               <img alt="Zapier" className="relative top-[-2px] inline-block" src={ZapierLogo} />
             </span>

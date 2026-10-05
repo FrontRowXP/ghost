@@ -38,7 +38,7 @@ function getJSONPayload(payload) {
 
 export class VersionMismatchError extends AjaxError {
     constructor(payload) {
-        super(payload, 'API server is running a newer version of Ghost, please upgrade.');
+        super(payload, 'API server is running a newer version of Frontro, please upgrade.');
     }
 }
 
@@ -129,7 +129,7 @@ export function getErrorCode(errorOrStatus) {
 
 export class MaintenanceError extends AjaxError {
     constructor(payload) {
-        super(payload, 'Ghost is currently undergoing maintenance, please wait a moment then retry.');
+        super(payload, 'Frontro is currently undergoing maintenance, please wait a moment then retry.');
     }
 }
 

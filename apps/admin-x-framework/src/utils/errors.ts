@@ -53,7 +53,7 @@ export class VersionMismatchError extends JSONError {
     super(
       response,
       data,
-      'API server is running a newer version of Ghost, please upgrade.',
+      'API server is running a newer version of Frontro, please upgrade.',
       errorOptions,
     );
   }
@@ -93,7 +93,7 @@ export class MaintenanceError extends APIError {
     super(
       response,
       data,
-      'Ghost is currently undergoing maintenance, please wait a moment then retry.',
+      'Frontro is currently undergoing maintenance, please wait a moment then retry.',
       errorOptions,
     );
   }

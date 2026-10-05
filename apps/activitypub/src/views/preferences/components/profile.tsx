@@ -196,7 +196,7 @@ const ProfileCard: React.FC<ProfileCardProps> = memo(
             style={{ color: textColor }}
           >
             {!isLoading ? (
-              'Available on Ghost, Flipboard, Threads, Bluesky, Mastodon, or wherever you get your social web feeds.'
+              'Available on Frontro, Flipboard, Threads, Bluesky, Mastodon, or wherever you get your social web feeds.'
             ) : (
               <Skeleton className="w-28" />
             )}

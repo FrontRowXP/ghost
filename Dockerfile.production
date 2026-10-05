@@ -119,6 +119,7 @@ COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX --from=deploy /home/ghost ./
 # cp -a preserves the nobody:nogroup ownership set at COPY time, so base_content
 # and default need no re-chown; only the writable content/log dirs flip to ghost.
 RUN mkdir -p default log && \
+    node scripts/frontro-theme-branding.mjs content/themes && \
     cp -a content base_content && \
     cp -a content/themes/casper default/casper && \
     ([ -d content/themes/source ] && cp -a content/themes/source default/source || true) && \
@@ -151,5 +152,7 @@ FROM core AS full
 COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX ghost/core/core/built/admin core/built/admin
 COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX ghost/core/core/built/embed-renderer core/built/embed-renderer
 COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX apps/sodo-search/umd core/frontend/public/gather-search
+COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX apps/portal/umd core/frontend/public/gather-portal
+COPY --chown=nobody:nogroup --chmod=u=rwX,go=rX apps/admin-toolbar/umd core/frontend/public/gather-toolbar
 
-RUN node -e "const fs = require('fs'); for (const path of ['core/built/admin/index.html', 'core/frontend/public/gather-search/sodo-search.min.js', 'core/frontend/public/gather-search/main.css']) fs.accessSync(path, fs.constants.R_OK);"
+RUN node -e "const fs = require('fs'); for (const path of ['core/built/admin/index.html', 'core/frontend/public/gather-search/sodo-search.min.js', 'core/frontend/public/gather-search/main.css', 'core/frontend/public/gather-portal/portal.min.js', 'core/frontend/public/frontro/icon.svg']) fs.accessSync(path, fs.constants.R_OK);"

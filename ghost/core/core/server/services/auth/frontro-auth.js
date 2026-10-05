@@ -117,8 +117,9 @@ module.exports.createFrontroAuth = function createFrontroAuth({
     sameOrigin(req);
     await store.delete(binding(req));
     const token = randomBytes(32).toString('hex');
+    const expiresAt = now() + 600000;
     // Reserve before awaiting the provider so concurrent starts stay bounded.
-    if (!(await store.reserve(token, now() + 600000))) throw failure(429, 'frontro_auth_busy');
+    if (!(await store.reserve(token, expiresAt))) throw failure(429, 'frontro_auth_busy');
     let result;
     try { result = await call('/auth/handoffs', { body: {} }); }
     catch (error) { await store.delete(token); throw error; }
@@ -130,7 +131,7 @@ module.exports.createFrontroAuth = function createFrontroAuth({
     try {
       await store.put(token, {
         id: data.id, secret: data.secret, cookie: readCookie(headers, '__Host-moments_flow'),
-        expiresAt: now() + 600000,
+        expiresAt,
       });
       res.cookie(bindingCookie, token, { ...cookieOptions(), maxAge: 600000 });
     } catch (error) { await store.delete(token); throw error; }

@@ -30,17 +30,17 @@ export class SealedRedisStore {
         if (!TOKEN.test(token)) throw new Error('Invalid session token');
         return `${this.prefix}:record:${token}`;
     }
-    private seal(value: unknown): string {
+    private seal(token: string, value: unknown): string {
         const iv = randomBytes(12);
         const cipher = createCipheriv('aes-256-gcm', this.key, iv);
-        cipher.setAAD(Buffer.from(this.prefix));
+        cipher.setAAD(Buffer.from(this.recordKey(token)));
         const ciphertext = Buffer.concat([cipher.update(JSON.stringify(value)), cipher.final()]);
         return Buffer.concat([iv, cipher.getAuthTag(), ciphertext]).toString('base64');
     }
-    private open(record: string) {
+    private open(token: string, record: string) {
         const bytes = Buffer.from(record, 'base64');
         const cipher = createDecipheriv('aes-256-gcm', this.key, bytes.subarray(0, 12));
-        cipher.setAAD(Buffer.from(this.prefix));
+        cipher.setAAD(Buffer.from(this.recordKey(token)));
         cipher.setAuthTag(bytes.subarray(12, 28));
         return JSON.parse(Buffer.concat([cipher.update(bytes.subarray(28)), cipher.final()]).toString());
     }
@@ -55,18 +55,18 @@ export class SealedRedisStore {
             local latest = redis.call('ZREVRANGE', KEYS[1], 0, 0, 'WITHSCORES')
             redis.call('PEXPIRE', KEYS[1], tonumber(latest[2]) - tonumber(ARGV[1]))
             return 1`, 2, `${this.prefix}:pending`, this.recordKey(token),
-        this.now(), expiresAt, ttl, this.maxRecords, this.seal({expiresAt}), token);
+        this.now(), expiresAt, ttl, this.maxRecords, this.seal(token, {expiresAt}), token);
         return Number(result) === 1;
     }
     async put(token: string, value: {expiresAt: number} & Record<string, unknown>) {
         const ttl = value.expiresAt - this.now();
         if (ttl <= 0) throw new Error('Expired session');
-        const updated = await this.redis.set(this.recordKey(token), this.seal(value), 'PX', ttl, 'XX');
+        const updated = await this.redis.set(this.recordKey(token), this.seal(token, value), 'PX', ttl, 'XX');
         if (!updated) throw new Error('Session reservation expired');
     }
     async get(token: string) {
         const record = await this.redis.get(this.recordKey(token));
-        return record ? this.open(record) : null;
+        return record ? this.open(token, record) : null;
     }
     async consume(token: string) {
         const record = await this.redis.eval(`
@@ -74,7 +74,7 @@ export class SealedRedisStore {
             redis.call('DEL', KEYS[1])
             redis.call('ZREM', KEYS[2], ARGV[1])
             return value`, 2, this.recordKey(token), `${this.prefix}:pending`, token);
-        return typeof record === 'string' ? this.open(record) : null;
+        return typeof record === 'string' ? this.open(token, record) : null;
     }
     async delete(token: string | null) {
         if (token) await this.consume(token);

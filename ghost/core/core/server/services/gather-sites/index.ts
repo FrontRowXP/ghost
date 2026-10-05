@@ -4,7 +4,7 @@ import {SealedRedisStore} from '../../lib/gather/redis-store';
 import {createSiteHub} from './hub';
 
 let hub: ReturnType<typeof createSiteHub> | undefined;
-let redis: {quit(): Promise<unknown>} | undefined;
+let redis: {quit(): Promise<unknown>; disconnect(): void} | undefined;
 export async function init() {
     if (hub) return;
     if (config.get('gather:sites:enabled') !== true) return;
@@ -23,11 +23,12 @@ export async function init() {
         if (!(await database.schema.hasTable(name))) throw new Error('Gather site registry migration is missing');
     }
     // Own this connection rather than reusing the global cache adapter's client.
-    const redisStore = require('cache-manager-ioredis').create(settings.redis);
+    const redisStore = require('cache-manager-ioredis').create({...settings.redis, connectTimeout: 5000, maxRetriesPerRequest: 1});
     const client = redisStore.getClient();
     redis = client;
     const prefix = `gather:{${settings.environment}-sites}`;
     try {
+        await client.ping();
         const sessions = new SealedRedisStore(client, `${prefix}:sessions`, settings.sessionSealingKey, 10000);
         const handoffs = new SealedRedisStore(client, `${prefix}:handoffs`, settings.sessionSealingKey);
         hub = createSiteHub({registry: new SiteRegistry(database), sessions, handoffs, origin,
@@ -39,5 +40,5 @@ export async function shutdown() {
     hub = undefined;
     const connection = redis;
     redis = undefined;
-    if (connection) await connection.quit();
+    if (connection) connection.disconnect();
 }

@@ -81,6 +81,9 @@ test('Redis records hide delegated cookies, authenticate ciphertext and consume 
     assert.equal((await store.get(token)).cookie, 'private-session-cookie');
     const wrongKey = new SealedRedisStore(redis, 'gather:{test}:handoffs', 'd'.repeat(64), 1, () => 100);
     await assert.rejects(wrongKey.get(token));
+    const alternate = 'e'.repeat(64);
+    redis.records.set(`gather:{test}:handoffs:record:${alternate}`, [...redis.records.values()][0]);
+    await assert.rejects(store.get(alternate)); // A copied ciphertext cannot become a different browser session.
     const results = await Promise.all([store.consume(token), store.consume(token)]);
     assert.equal(results.filter(Boolean).length, 1);
 });

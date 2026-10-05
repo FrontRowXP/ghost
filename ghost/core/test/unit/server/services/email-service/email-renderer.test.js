@@ -2198,7 +2198,7 @@ describe('Email renderer', function () {
       assert.match(response.html, /class="site-title"[^>]*?>Test Newsletter/);
     });
 
-    it('includes Ghost badge if enabled', async function () {
+    it('includes Frontro badge if enabled', async function () {
       const post = createModel(basePost);
       const newsletter = createModel({
         header_image: null,
@@ -2211,8 +2211,8 @@ describe('Email renderer', function () {
 
       const response = await emailRenderer.renderBody(post, newsletter, segment, options);
 
-      // Does include include Ghost badge
-      assert.match(response.html, /https:\/\/ghost.org\//);
+      // Includes Frontro badge
+      assert.match(response.html, /https:\/\/frontro.com\//);
 
       // Test feedback buttons not included
       assert(!response.html.includes('http://feedback-link.com/?score=1'));
@@ -2274,7 +2274,7 @@ describe('Email renderer', function () {
       assert.doesNotMatch(response.html, /is-dark-background/);
     });
 
-    it('replaces all links except the unsubscribe, feedback and powered by Ghost links', async function () {
+    it('replaces all links except the unsubscribe, feedback and powered by Frontro links', async function () {
       const post = createModel(basePost);
       const newsletter = createModel({
         header_image: null,
@@ -2308,7 +2308,7 @@ describe('Email renderer', function () {
           assert.equal(href, '%%{unsubscribe_url}%%');
         } else if (href.includes('feedback-link.com')) {
           assert(href.includes('%%{uuid}%%'));
-        } else if (href.includes('https://ghost.org/?via=pbg-newsletter')) {
+        } else if (href.includes('https://frontro.com/?via=pbf-newsletter')) {
           assert(!href.includes('tracked-link.com'));
         } else {
           assert(href.includes('tracked-link.com'));
@@ -2329,7 +2329,7 @@ describe('Email renderer', function () {
         `http://feedback-link.com/?score=0&uuid=%%{uuid}%%&key=%%{key}%%`,
         `http://tracked-link.com/?m=%%{uuid}%%&url=http%3A%2F%2Fexample.com%2F%3Fsource_tracking%3DTest%2BNewsletter%26post_tracking%3Dadded%23%2Fshare`,
         `%%{unsubscribe_url}%%`,
-        `https://ghost.org/?via=pbg-newsletter&source_tracking=site`,
+        `https://frontro.com/?via=pbf-newsletter&source_tracking=site`,
       ]);
 
       // Check uuid in replacements
@@ -2382,7 +2382,7 @@ describe('Email renderer', function () {
         'http://feedback-link.com/?score=0&uuid=%%{uuid}%%&key=%%{key}%%',
         'http://example.com/#/share',
         '%%{unsubscribe_url}%%',
-        'https://ghost.org/?via=pbg-newsletter',
+        'https://frontro.com/?via=pbf-newsletter',
       ]);
     });
 
@@ -2416,7 +2416,7 @@ describe('Email renderer', function () {
           assert.equal(href, '%%{unsubscribe_url}%%');
         } else if (href.includes('feedback-link.com')) {
           assert(href.includes('%%{uuid}%%'));
-        } else if (href.includes('https://ghost.org/?via=pbg-newsletter')) {
+        } else if (href.includes('https://frontro.com/?via=pbf-newsletter')) {
           assert(!href.includes('tracked-link.com'));
         } else {
           assert(href.includes('tracked-link.com'));
@@ -2435,7 +2435,7 @@ describe('Email renderer', function () {
         `http://feedback-link.com/?score=0&uuid=%%{uuid}%%&key=%%{key}%%`,
         `http://tracked-link.com/?m=%%{uuid}%%&url=http%3A%2F%2Fexample.com%2F%3Fsource_tracking%3DTest%2BNewsletter%26post_tracking%3Dadded%23%2Fshare`,
         `%%{unsubscribe_url}%%`,
-        `https://ghost.org/?via=pbg-newsletter&source_tracking=site`,
+        `https://frontro.com/?via=pbf-newsletter&source_tracking=site`,
       ]);
 
       // Check uuid in replacements

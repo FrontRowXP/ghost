@@ -1174,7 +1174,7 @@ Object {
     <meta name=\\"twitter:url\\" content=\\"http://127.0.0.1:2369/\\">
     <meta name=\\"twitter:image\\" content=\\"http://127.0.0.1:2369/content/images/site-cover.png\\">
     
-    <meta name=\\"generator\\" content=\\"Ghost \\">
+    <meta name=\\"generator\\" content=\\"Frontro \\">
     <link rel=\\"alternate\\" type=\\"application/rss+xml\\" title=\\"Ghost\\" href=\\"http://localhost:65530/rss/\\">
     
     <script defer src=\\"https://cdn.jsdelivr.net/ghost/sodo-search@~[[VERSION]]/umd/sodo-search.min.js\\" data-key=\\"xyz\\" data-styles=\\"https://cdn.jsdelivr.net/ghost/sodo-search@~[[VERSION]]/umd/main.css\\" data-sodo-search=\\"http://127.0.0.1:2369/\\" data-locale=\\"en\\" crossorigin=\\"anonymous\\"></script>
@@ -3625,7 +3625,7 @@ Object {
     <meta name=\\"twitter:url\\" content=\\"http://localhost:65530/\\">
     <meta name=\\"twitter:image\\" content=\\"http://localhost:65530/content/images/site-cover.png\\">
     
-    <meta name=\\"generator\\" content=\\"Ghost \\">
+    <meta name=\\"generator\\" content=\\"Frontro \\">
     <link rel=\\"alternate\\" type=\\"application/rss+xml\\" title=\\"Ghost\\" href=\\"http://localhost:65530/rss/\\">
     
     <script defer src=\\"https://cdn.jsdelivr.net/ghost/sodo-search@~[[VERSION]]/umd/sodo-search.min.js\\" data-key=\\"xyz\\" data-styles=\\"https://cdn.jsdelivr.net/ghost/sodo-search@~[[VERSION]]/umd/main.css\\" data-sodo-search=\\"http://localhost:65530/\\" data-locale=\\"en\\" crossorigin=\\"anonymous\\"></script>
@@ -3716,7 +3716,7 @@ Object {
   "rendered": "<meta name=\\"description\\" content=\\"site description\\">
     <link rel=\\"canonical\\" href=\\"http://localhost:65530/\\">
     <meta name=\\"referrer\\" content=\\"no-referrer-when-downgrade\\">
-    <meta name=\\"generator\\" content=\\"Ghost \\">
+    <meta name=\\"generator\\" content=\\"Frontro \\">
     <link rel=\\"alternate\\" type=\\"application/rss+xml\\" title=\\"Ghost\\" href=\\"http://localhost:65530/rss/\\">
     
     <script defer src=\\"https://cdn.jsdelivr.net/ghost/sodo-search@~[[VERSION]]/umd/sodo-search.min.js\\" data-key=\\"xyz\\" data-styles=\\"https://cdn.jsdelivr.net/ghost/sodo-search@~[[VERSION]]/umd/main.css\\" data-sodo-search=\\"http://localhost:65530/\\" data-locale=\\"en\\" crossorigin=\\"anonymous\\"></script>

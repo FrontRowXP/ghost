@@ -61,6 +61,7 @@ jobs:
           pnpm --filter @tryghost/portal exec vitest run test/portal-links.test.jsx
           pnpm --filter @tryghost/admin-toolbar exec vitest run test/admin-toolbar.test.js
           pnpm --filter ghost exec vitest run test/unit/frontend/utils/frontend-apps.test.ts test/unit/frontend/helpers/ghost-head.test.js test/unit/frontend/services/rss/generate-feed.test.js test/unit/server/services/mail/ghost-mailer.test.js test/unit/server/services/auth/session/session-service.test.js --maxWorkers=2
+          pnpm --filter ghost exec vitest run test/unit/server/services/email-service/email-renderer.test.js --maxWorkers=2 -t 'includes Frontro badge|replaces all links except|handles encoded links|replaces all relative links'
       - name: Reject inherited publication workflows
         run: |
           unexpected=$(find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) ! -name gather.yml)

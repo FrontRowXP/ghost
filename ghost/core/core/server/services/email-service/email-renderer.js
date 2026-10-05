@@ -663,11 +663,11 @@ class EmailRenderer {
             url = this.#outboundLinkTagger.addToUrl(url);
           }
 
-          // Don't add tracking to the Powered by Ghost badge
+          // Don't count platform attribution as reader engagement.
           if (
-            url.hostname === 'ghost.org' &&
             url.pathname === '/' &&
-            url.searchParams.get('via') === 'pbg-newsletter'
+            ((url.hostname === 'ghost.org' && url.searchParams.get('via') === 'pbg-newsletter') ||
+             (url.hostname === 'frontro.com' && url.searchParams.get('via') === 'pbf-newsletter'))
           ) {
             return url.toString();
           }

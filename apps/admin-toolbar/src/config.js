@@ -20,7 +20,7 @@ export function getConfig(script) {
 
   return {
     adminUrl,
-    siteTitle: dataset.siteTitle || 'Ghost',
+    siteTitle: dataset.siteTitle || 'Frontro',
     pageContext: dataset.pageContext || '',
     resourceType: dataset.resourceType || '',
     resourceId: dataset.resourceId || '',

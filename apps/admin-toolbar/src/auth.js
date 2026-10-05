@@ -4,7 +4,7 @@ export function createAuthFrame(adminUrl) {
   const frame = document.createElement('iframe');
   frame.dataset.frame = 'admin-auth';
   frame.src = `${adminUrl}auth-frame/`;
-  frame.title = 'Ghost admin authentication';
+  frame.title = 'Frontro admin authentication';
   frame.tabIndex = -1;
   frame.style.cssText = 'display:none;width:0;height:0;border:0;';
   document.body.appendChild(frame);

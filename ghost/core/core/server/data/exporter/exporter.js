@@ -8,9 +8,10 @@ const messages = {
   errorExportingData: 'Error exporting data',
 };
 
-const { TABLES_ALLOWLIST, SETTING_KEYS_BLOCKLIST } = require('./table-lists');
+const { TABLES_ALLOWLIST, SETTING_KEYS_BLOCKLIST, PLATFORM_TABLES } = require('./table-lists');
 
 const exportTable = function exportTable(tableName, options) {
+  if (PLATFORM_TABLES.includes(tableName)) return;
   if (
     TABLES_ALLOWLIST.includes(tableName) ||
     (options.include && Array.isArray(options.include) && options.include.indexOf(tableName) !== -1)

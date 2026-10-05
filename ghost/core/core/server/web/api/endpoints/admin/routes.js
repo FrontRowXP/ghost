@@ -20,6 +20,15 @@ module.exports = function apiRoutes() {
   // ## Public
   router.get('/site', mw.publicAdminApi, http(api.site.read));
 
+  // Independent Moments workspace sessions: visitors need no publication staff
+  // account. Every write checks the exact origin and a server-issued CSRF token.
+  router.get('/gather/session', api.gatherSites.readSession);
+  router.get('/gather/sites', api.gatherSites.browse);
+  router.post('/gather/sites', shared.middleware.brute.globalBlock, api.gatherSites.add);
+  router.post('/gather/auth/start', shared.middleware.brute.globalBlock, api.gatherSites.start);
+  router.post('/gather/auth/complete', shared.middleware.brute.globalBlock, api.gatherSites.complete);
+  router.delete('/gather/session', api.gatherSites.logout);
+
   // ## Configuration
   router.get('/config', mw.authAdminApi, http(api.config.read));
   router.get('/config/featurebase', mw.authAdminApi, http(api.config.featurebase));

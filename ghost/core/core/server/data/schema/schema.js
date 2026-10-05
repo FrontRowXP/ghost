@@ -2641,3 +2641,6 @@ module.exports = {
     updated_at: { type: 'dateTime', nullable: true },
   },
 };
+
+// Gather control-plane records share the existing database.
+Object.assign(module.exports, require('./gather-registry'));

@@ -98,7 +98,7 @@ sessionService.removeUserForSession = async (req, res) => {
   const session = await expressSession.getSession(req, res);
   const upstream = session.frontroSession;
   delete session.frontroSession;
-  frontroAuth.discard(req, res);
+  await frontroAuth.discard(req, res);
   await removeUserForSession(req, res);
   await frontroAuth.revoke(upstream);
 };

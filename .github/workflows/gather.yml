@@ -18,6 +18,32 @@ jobs:
     name: Gather compatibility
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: gather_test
+          POSTGRES_PASSWORD: gather_test
+          POSTGRES_DB: gather_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U gather_test" --health-interval 10s
+          --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 10s
+          --health-timeout 5s --health-retries 5
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_HOST: '%'
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -proot" --health-interval 10s
+          --health-timeout 5s --health-retries 10
     env:
       NX_DAEMON: 'false'
       NX_NATIVE_COMMAND_RUNNER: 'false'
@@ -37,6 +63,12 @@ jobs:
         run: pnpm --filter-prod 'ghost^...' -r run build
       - name: Build the production frontend and backend
         run: pnpm build:production
+      - name: Preserve reviewable compiled site-management UI
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gather-admin-preview
+          path: ghost/core/core/built/admin
+          retention-days: 3
       - name: Configuration and publishing regression tests
         working-directory: ghost/core
         run: pnpm exec vitest run test/unit/shared/config/utils.test.js test/unit/server/models/post.test.js test/unit/frontend/web/middleware/serve-public-file.test.js --maxWorkers=2
@@ -45,10 +77,18 @@ jobs:
         run: node --import=tsx --conditions=source --test scripts/gather-assets.test.mjs scripts/gather-origin.test.mjs
       - name: Frontro staff authentication boundary tests
         run: node --experimental-strip-types --test ghost/core/scripts/frontro-auth.test.cjs ghost/core/scripts/frontro-auth-client.test.cjs ghost/core/scripts/frontro-auth-serialization.test.cjs
+      - name: Gather registry and session boundaries
+        working-directory: ghost/core
+        env:
+          GATHER_DISPOSABLE_CI: '1'
+        run: |
+          node --import=tsx --conditions=source --test scripts/gather-tenancy.test.mjs scripts/gather-registry.integration.mjs
+          pnpm exec vitest run test/unit/server/data/schema/integrity.test.ts test/unit/server/data/exporter/index.test.js --maxWorkers=2
+          pnpm exec vitest run -c vitest.config.db.ts --project e2e-api test/e2e-api/admin/gather-sites.test.js test/e2e-api/admin/frontro-auth.test.js --maxWorkers=2
       - name: Install the isolated acceptance browser
         run: pnpm --filter @tryghost/admin exec playwright install --with-deps chromium
       - name: Frontro authentication and older-backend browser acceptance
-        run: pnpm --filter @tryghost/admin test:acceptance src/auth/frontro/frontro-signin.acceptance.test.tsx src/auth/signin.acceptance.test.tsx src/layout/frontro-signout.acceptance.test.tsx
+        run: pnpm --filter @tryghost/admin test:acceptance src/sites/site-hub.acceptance.test.tsx src/auth/frontro/frontro-signin.acceptance.test.tsx src/auth/signin.acceptance.test.tsx src/layout/frontro-signout.acceptance.test.tsx
       - name: Deployment qualification gate tests
         run: python3 -m unittest discover -s infra/deployer -p 'test_*.py'
       - name: Build the bundled public search frontend

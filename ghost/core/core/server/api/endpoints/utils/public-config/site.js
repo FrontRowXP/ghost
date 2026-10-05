@@ -29,6 +29,8 @@ module.exports = function getSiteProperties() {
   };
 
   const frontroAuth = publicConfiguration(config.get('security:frontroAuth'));
+  const siteHub = require('../../../../services/gather-sites').getHub();
+  if (siteHub) siteProperties.gatherSites = siteHub.capability;
   if (frontroAuth) {
     siteProperties.frontroAuth = frontroAuth;
     siteProperties.authReact = true;

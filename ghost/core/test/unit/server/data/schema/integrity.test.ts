@@ -41,7 +41,7 @@ const parseYaml = require('../../../../../core/server/services/route-settings/ya
  */
 describe('DB version integrity', function () {
   // Only these variables should need updating
-  const currentSchemaHash = 'ac1a10c4b453d67523075ebfd7da5a1a';
+  const currentSchemaHash = '1dd4267a5e62b7dcea65c222a1ffa78b';
   const currentFixturesHash = '7b7dc2bb39eb98031ef81223c5f5c28e';
   const currentSettingsHash = 'ad77752f31c6a7f174c04c499214b975';
   const currentRoutesHash = 'd8c25fa01bf6d22a2bcb05ba0de70dc1';

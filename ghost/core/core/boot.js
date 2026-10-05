@@ -139,6 +139,9 @@ async function initCore({ ghostServer, config }) {
   debug('Begin: settings');
   const settings = require('./server/services/settings/settings-service');
   await settings.init();
+  await require('./server/services/gather-sites').init();
+  if (ghostServer) ghostServer.registerCleanupTask(
+    () => require('./server/services/gather-sites').shutdown(), 'Gather site management');
   await settings.syncEmailSettings(config.get('hostSettings:emailVerification:verified'));
   debug('End: settings');
 

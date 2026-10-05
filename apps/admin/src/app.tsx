@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Outlet } from '@tryghost/admin-x-framework';
+import { Outlet, useLocation } from '@tryghost/admin-x-framework';
+import SiteHub from './sites/site-hub';
 import { useBrowseSettings } from '@tryghost/admin-x-framework/api/settings';
 import { useCurrentUser } from '@tryghost/admin-x-framework/api/current-user';
 import { EmberProvider, EmberFallback, EmberRoot } from './ember-bridge';
@@ -18,6 +19,12 @@ import { useAccentColorProperties } from './hooks/use-accent-color-properties';
 import { SignedOutApp, useAuthNotice, useAuthScreensOwner } from './auth/api';
 
 function App() {
+  const {pathname} = useLocation();
+  if (pathname === '/sites' || pathname.startsWith('/sites/')) return <SiteHub />;
+  return <PublicationApp />;
+}
+
+function PublicationApp() {
   const { data: currentUser, errorUpdatedAt } = useCurrentUser();
   // Not `isError`: every new observer of the failed query refetches it and
   // reports it pending meanwhile, which would unmount the signed-out screens.

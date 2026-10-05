@@ -34,20 +34,32 @@ module.exports.publicConfiguration = publicConfiguration;
 module.exports.createFrontroAuth = function createFrontroAuth({
   getConfig, getAdminOrigin, getAdminPath = () => '/ghost', findUserById, createSession,
   fetch: request = globalThis.fetch, now = Date.now,
+  handoffStore, bindingCookie = BINDING_COOKIE, acceptIdentity,
 }) {
   // Gather Core is a singleton. A restart intentionally expires pending login
   // attempts; authenticated sessions continue in Ghost's persistent store.
   const handoffs = new Map();
+  const store = handoffStore || {
+    async reserve(token, expiresAt) {
+      for (const [key, value] of handoffs) if (value.expiresAt <= now()) handoffs.delete(key);
+      if (handoffs.size >= 1000) return false;
+      handoffs.set(token, { expiresAt });
+      return true;
+    },
+    async put(token, value) { handoffs.set(token, value); },
+    async consume(token) { const value = handoffs.get(token); handoffs.delete(token); return value; },
+    async delete(token) { handoffs.delete(token); },
+  };
   const cookieOptions = () => ({ secure: true, httpOnly: true, sameSite: 'lax', path: getAdminPath() });
   function binding(req) {
     const cookies = (req.get('cookie') || '').split(';').map(value => value.trim())
-      .filter(value => value.startsWith(BINDING_COOKIE + '='));
-    const value = cookies.length === 1 ? cookies[0].slice(BINDING_COOKIE.length + 1) : '';
+      .filter(value => value.startsWith(bindingCookie + '='));
+    const value = cookies.length === 1 ? cookies[0].slice(bindingCookie.length + 1) : '';
     return TOKEN.test(value) ? value : null;
   }
-  function discard(req, res) {
-    handoffs.delete(binding(req));
-    res.clearCookie(BINDING_COOKIE, cookieOptions());
+  async function discard(req, res) {
+    await store.delete(binding(req));
+    res.clearCookie(bindingCookie, cookieOptions());
   }
   function configuration() {
     const config = getConfig();
@@ -103,39 +115,36 @@ module.exports.createFrontroAuth = function createFrontroAuth({
 
   async function start(req, res) {
     sameOrigin(req);
-    for (const [key, value] of handoffs) {
-      if (value.expiresAt <= now()) handoffs.delete(key);
-    }
-    handoffs.delete(binding(req));
-    if (handoffs.size >= 1000) throw failure(429, 'frontro_auth_busy');
+    await store.delete(binding(req));
     const token = randomBytes(32).toString('hex');
     // Reserve before awaiting the provider so concurrent starts stay bounded.
-    handoffs.set(token, { expiresAt: now() + 600000 });
+    if (!(await store.reserve(token, now() + 600000))) throw failure(429, 'frontro_auth_busy');
     let result;
     try { result = await call('/auth/handoffs', { body: {} }); }
-    catch (error) { handoffs.delete(token); throw error; }
+    catch (error) { await store.delete(token); throw error; }
     const { data, headers } = result;
     if (!UUID.test(data?.id) || !TOKEN.test(data?.secret) || !/^[A-Z0-9_-]{8}$/.test(data?.code) || data?.expiresIn !== 600) {
-      handoffs.delete(token);
+      await store.delete(token);
       throw failure(503, 'frontro_auth_unavailable');
     }
     try {
-      handoffs.set(token, {
+      await store.put(token, {
         id: data.id, secret: data.secret, cookie: readCookie(headers, '__Host-moments_flow'),
         expiresAt: now() + 600000,
       });
-      res.cookie(BINDING_COOKIE, token, { ...cookieOptions(), maxAge: 600000 });
-    } catch (error) { handoffs.delete(token); throw error; }
+      res.cookie(bindingCookie, token, { ...cookieOptions(), maxAge: 600000 });
+    } catch (error) { await store.delete(token); throw error; }
     res.set('Cache-Control', 'no-store');
     res.json({ id: data.id, code: data.code });
   }
 
   async function complete(req, res) {
     sameOrigin(req);
-    const handoff = handoffs.get(binding(req));
+    const token = binding(req);
+    const handoff = token ? await store.consume(token) : null;
     // Consume our browser binding before the upstream exchange, including on
     // failure. Retrying a lost response requires a fresh handoff, never a grant.
-    discard(req, res);
+    res.clearCookie(bindingCookie, cookieOptions());
     if (!handoff?.id || handoff.expiresAt <= now()) throw failure(401, 'frontro_handoff_expired');
     const { data, headers } = await call('/auth/handoffs/' + handoff.id + '/exchange', {
       cookie: handoff.cookie, body: { secret: handoff.secret },
@@ -144,6 +153,18 @@ module.exports.createFrontroAuth = function createFrontroAuth({
     const cookie = readCookie(headers, '__Host-moments_session');
     const { data: identity } = await call('/me', { cookie });
     const subject = identity?.user?.id;
+    // The site-management hub issues its own session after the same verified
+    // exchange. It never creates or elevates a publication staff account.
+    if (acceptIdentity) {
+      if (!UUID.test(subject)) {
+        await revoke({ cookie, csrf: identity?.user?.csrfToken });
+        throw failure(403, 'frontro_identity_required');
+      }
+      try { await acceptIdentity(req, res, identity, { cookie, subject, csrf: identity.user.csrfToken }); }
+      catch (error) { await revoke({ cookie, csrf: identity?.user?.csrfToken }); throw error; }
+      res.set('Cache-Control', 'no-store');
+      return res.json({ authenticated: true });
+    }
     const config = configuration();
     const staffId = UUID.test(subject) && Object.hasOwn(config.staff || {}, subject) ? config.staff[subject] : null;
     const user = staffId && await findUserById(staffId);
@@ -185,5 +206,10 @@ module.exports.createFrontroAuth = function createFrontroAuth({
     catch { /* Always permit local logout even if Moments is unavailable. */ }
   }
 
-  return { start, complete, validate, revoke, discard };
+  async function identity(stored) {
+    const { data } = await call('/me', { cookie: stored.cookie });
+    if (data?.user?.id !== stored.subject) throw failure(401, 'frontro_identity_required');
+    return data;
+  }
+  return { start, complete, validate, revoke, discard, identity };
 };

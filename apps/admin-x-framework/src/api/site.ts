@@ -18,6 +18,7 @@ export type SiteData = {
   authReact?: boolean;
   /** Present only when Core supports the Moments staff-session bridge. */
   frontroAuth?: { apiOrigin: string };
+  gatherSites?: {apiOrigin: string; creationEnabled: boolean; version: number};
 };
 
 export interface SiteResponseType {

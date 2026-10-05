@@ -1,0 +1,13 @@
+.gather-sites { max-width: 880px; margin: 0 auto; padding: 48px 24px; color: var(--foreground); }
+.gather-sites-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.gather-sites-logo { width: 160px; height: auto; }
+.gather-sites h1 { font-size: 32px; font-weight: 600; margin: 48px 0 12px; }
+.gather-sites h2 { font-size: 20px; font-weight: 600; margin-bottom: 12px; }
+.gather-sites p { margin-bottom: 20px; }
+.gather-sites-actions { justify-content: flex-start; margin-top: 32px; }
+.gather-sites-list { display: grid; gap: 16px; margin: 32px 0; }
+.gather-site-card { border: 1px solid var(--border); border-radius: 16px; padding: 24px; background: var(--background); }
+.gather-site-form { display: grid; gap: 12px; max-width: 440px; }
+.gather-site-form select { border: 1px solid var(--border); border-radius: 6px; padding: 8px; background: var(--background); }
+.gather-sites a { text-decoration: underline; }
+.frontro-sites-entry { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 100; text-align: center; text-decoration: underline; }

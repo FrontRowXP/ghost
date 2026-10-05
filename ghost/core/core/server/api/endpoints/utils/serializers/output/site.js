@@ -8,6 +8,7 @@ module.exports = {
     frame.response = {
       site: _.pick(data, [
         'title',
+        'gatherSites',
         'description',
         'logo',
         'icon',

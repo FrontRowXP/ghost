@@ -117,8 +117,15 @@ behavior for publishing, authentication and assets; strip the origin credential
 from responses. Validate the cloned version before activation.
 
 Each tenant zone needs a Fastly edge wildcard certificate and its validation DNS.
-The service-scoped API keys currently reject TLS management with HTTP 403; they
-cannot commission those certificates. Existing wildcard DNS already resolves
+The existing AWS key in `prod/channel/env` can configure both Gather services,
+but its owner has the Engineer role. Even its global API scope does not grant TLS
+administration: TLS subscription requests return HTTP 403. Use a TLS-capable
+account in the existing Fastly customer; creating another account does not repair
+these services. The saved account requires two-factor authentication before a
+temporary commissioning token can be issued. Keep credentials out of logs.
+
+The current hub certificate covers `*.frontro.com`, which does not cover the
+deeper tenant addresses. Existing wildcard DNS already resolves
 nested Gather names to Fastly, but it does not assign them to the Gather services
 or provide a matching edge certificate. Existing origin SNI/certificate validation
 may remain pinned to the verified hub while HTTP Host selects its tenant ingress;
@@ -164,3 +171,20 @@ SDK and legacy AWS CLI clients, while an ordinary five-MiB PutObject succeeds.
 This isolates the failing multipart service path. Diagnostic objects/uploads were
 removed. Inspect and repair the NAS service before qualification; successful
 health reads or ordinary writes are insufficient.
+
+The NAS runs RustFS 1.0.0. The failure also reproduces with NAS administrator
+credentials, so Gather's restricted storage policy is not the cause. Read-only
+container diagnostics found RustFS threads waiting on ext4 journal commits and
+roughly 76% full host I/O pressure over five minutes, despite all three drives
+being reported online. Do not infer storage readiness from that drive inventory.
+
+The native signed admin API accepted a live scanner change to `speed=slow`,
+`max_concurrent_disk_scans=1`, `max_concurrent_set_scans=1`, and `cycle=600`;
+effective runtime settings report `source=config`. The previous scanner settings
+were retained privately for rollback. A subsequent 16-KiB multipart part still
+timed out after 30 seconds. This is pressure mitigation, not passing acceptance.
+Existing scans may remain active until they finish. Check scanner activity, host
+I/O pressure and journal waits before further changes; retain bitrot/heal
+protection and inspect NAS storage diagnostics before attempting a restart or
+filesystem repair. Repeat real multipart completion, range reads, deletion and
+encrypted recovery only after the underlying I/O boundary passes.

@@ -149,7 +149,7 @@ const OfficialThemes: React.FC<{
           rel="noopener noreferrer"
           target="_blank"
         >
-          Ghost Marketplace &rarr;
+          Theme marketplace &rarr;
         </a>
       </div>
     </ModalPage>

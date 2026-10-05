@@ -141,7 +141,7 @@ const Footer: React.FC<{
           style={{ color: textColor }}
         >
           <GhostOrb className="mr-[6px] size-4" />
-          <span>Powered by Ghost</span>
+          <span>Powered by Frontro</span>
         </span>
       </div>
     )}

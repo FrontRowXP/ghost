@@ -225,7 +225,7 @@ describe('admin-toolbar', function () {
 
     assert.deepEqual(links, [
       {
-        label: 'Open Ghost Admin for Jane Staff on Example Site',
+        label: 'Open Frontro Admin for Jane Staff on Example Site',
         href: 'https://admin.example.com/ghost/#/',
       },
       { label: 'Analytics', href: 'https://admin.example.com/ghost/#/analytics' },
@@ -244,7 +244,7 @@ describe('admin-toolbar', function () {
 
     assert.deepEqual(links, [
       {
-        label: 'Open Ghost Admin for Jane Staff on Example Site',
+        label: 'Open Frontro Admin for Jane Staff on Example Site',
         href: 'https://admin.example.com/ghost/#/',
       },
       { label: 'Posts', href: 'https://admin.example.com/ghost/#/posts/' },
@@ -260,7 +260,7 @@ describe('admin-toolbar', function () {
 
     assert.deepEqual(links, [
       {
-        label: 'Open Ghost Admin for Jane Staff on Example Site',
+        label: 'Open Frontro Admin for Jane Staff on Example Site',
         href: 'https://admin.example.com/ghost/#/',
       },
       { label: 'Analytics', href: 'https://admin.example.com/ghost/#/posts/analytics/post-id' },
@@ -297,7 +297,7 @@ describe('admin-toolbar', function () {
 
     assert.deepEqual(links, [
       {
-        label: 'Open Ghost Admin for Jane Staff on Example Site',
+        label: 'Open Frontro Admin for Jane Staff on Example Site',
         href: 'https://admin.example.com/ghost/#/',
       },
       { label: 'Analytics', href: 'https://admin.example.com/ghost/#/posts/analytics/post-id' },
@@ -313,7 +313,7 @@ describe('admin-toolbar', function () {
 
     assert.deepEqual(links, [
       {
-        label: 'Open Ghost Admin for Jane Staff on Example Site',
+        label: 'Open Frontro Admin for Jane Staff on Example Site',
         href: 'https://admin.example.com/ghost/#/',
       },
       { label: 'Edit', href: 'https://admin.example.com/ghost/#/tags/news' },
@@ -328,7 +328,7 @@ describe('admin-toolbar', function () {
 
     assert.deepEqual(links, [
       {
-        label: 'Open Ghost Admin for Jane Staff on Example Site',
+        label: 'Open Frontro Admin for Jane Staff on Example Site',
         href: 'https://admin.example.com/ghost/#/',
       },
       { label: 'Edit', href: 'https://admin.example.com/ghost/#/editor/page/page-id' },
@@ -343,7 +343,7 @@ describe('admin-toolbar', function () {
 
     assert.deepEqual(links, [
       {
-        label: 'Open Ghost Admin for Jane Staff on Example Site',
+        label: 'Open Frontro Admin for Jane Staff on Example Site',
         href: 'https://admin.example.com/ghost/#/',
       },
     ]);

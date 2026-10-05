@@ -105,7 +105,7 @@ const MemberDeleteModal: React.FC<MemberDeleteModalProps> = ({
         <DialogHeader>
           <DialogTitle>Delete member account</DialogTitle>
           <DialogDescription>
-            Permanently delete <strong>{displayIdentity}</strong> from Ghost.
+            Permanently delete <strong>{displayIdentity}</strong> from Frontro.
           </DialogDescription>
         </DialogHeader>
 

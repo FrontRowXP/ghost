@@ -564,7 +564,7 @@ const Domain: React.FC = () => {
                 <div className="mt-6 rounded-md border border-border-default bg-surface-elevated p-4">
                   <div className="text-sm font-medium text-foreground">Set up your redirect</div>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Add a redirect or proxy service to forward social web requests to Ghost.
+                    Add a redirect or proxy service to forward social web requests to Frontro.
                   </p>
                   <div className="mt-4 flex flex-col gap-3 text-sm">
                     <div>

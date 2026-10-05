@@ -65,7 +65,7 @@ export function DeleteModal({
               <strong>
                 {formatNumber(memberCount)} {memberCount === 1 ? 'member' : 'members'}
               </strong>
-              . This is permanent! All Ghost data will be deleted, this will have no effect on
+              . This is permanent! All Frontro data will be deleted, this will have no effect on
               subscriptions in Stripe.
             </p>
             <p>

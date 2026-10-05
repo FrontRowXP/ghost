@@ -46,7 +46,7 @@ module.exports = function ghost_foot(options) {
     data.giftToast = {
       accentColor: settingsCache.get('accent_color') || '#15171a',
       brandUrl: blogIcon.getIconUrl({ absolute: true, fallbackToDefault: false }),
-      orbUrl: `${siteUrl}/gift/assets/gift-card-orb.png`,
+      orbUrl: `${siteUrl}/public/frontro/icon.svg`,
       noiseUrl: `${siteUrl}/gift/assets/gift-card-noise.png`,
     };
 

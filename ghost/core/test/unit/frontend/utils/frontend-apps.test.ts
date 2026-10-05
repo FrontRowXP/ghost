@@ -27,6 +27,32 @@ describe('Frontend apps:', function () {
     });
   });
 
+  describe('Frontro bundled public apps', function () {
+    afterEach(async function () {
+      await configUtils.restore();
+    });
+
+    it('serves the branded Portal from the site including a configured subdirectory', function () {
+      configUtils.set({'security:frontroAuth:enabled': true, url: 'https://gather.example/blog/', 'portal:url': 'https://cdn.jsdelivr.net/ghost/portal@~2.71/umd/portal.min.js'});
+      assert.equal(getFrontendAppConfig('portal').scriptUrl, 'https://gather.example/blog/public/gather-portal/portal.min.js');
+    });
+
+    it('serves the branded staff toolbar from the same site', function () {
+      configUtils.set({'security:frontroAuth:enabled': true, url: 'https://gather.example', 'adminToolbar:url': 'https://cdn.jsdelivr.net/ghost/admin-toolbar@~1.0/umd/admin-toolbar.min.js'});
+      assert.equal(getFrontendAppConfig('adminToolbar').scriptUrl, 'https://gather.example/public/gather-toolbar/admin-toolbar.min.js');
+    });
+
+    it('preserves an explicitly configured external Portal integration', function () {
+      configUtils.set({'security:frontroAuth:enabled': true, 'portal:url': 'https://cdn.example/custom/portal.js'});
+      assert.equal(getFrontendAppConfig('portal').scriptUrl, 'https://cdn.example/custom/portal.js');
+    });
+
+    it('preserves the upstream URL on older backends without Frontro auth', function () {
+      configUtils.set({'security:frontroAuth:enabled': false, 'portal:url': 'https://cdn.jsdelivr.net/ghost/portal@~2.71/umd/portal.min.js'});
+      assert.equal(getFrontendAppConfig('portal').scriptUrl, 'https://cdn.jsdelivr.net/ghost/portal@~2.71/umd/portal.min.js');
+    });
+  });
+
   describe('getDataAttributes', function () {
     it('should generate data attributes string from object', async function () {
       const dataAttributes = getDataAttributes({

@@ -341,7 +341,7 @@ describe('Mail: Ghostmailer', function () {
 
       assert.equal(
         sendMailSpy.firstCall.args[0].from,
-        '"Ghost at default.com" <noreply@default.com>',
+        '"Frontro at default.com" <noreply@default.com>',
       );
     });
   });

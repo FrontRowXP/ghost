@@ -1,10 +1,8 @@
-import BookmarkThumb from '@/settings/assets/images/stripe-thumb.jpg';
-import GhostLogo from '@/settings/assets/images/orb-squircle.png';
-import GhostLogoPink from '@/settings/assets/images/orb-pink.png';
+import GhostLogo from '@/assets/img/frontro-icon.svg';
+import GhostLogoPink from '@/assets/img/frontro-icon.svg';
 import React, { useEffect, useState } from 'react';
 import StripeButton from '@/settings/components/stripe-button';
 import StripeLogo from '@/settings/assets/images/stripe-emblem.svg';
-import StripeVerifiedBadge from '@/settings/assets/images/stripe-verified.svg';
 import useSettingGroup from '@/settings/hooks/use-setting-group';
 import {
   Button,
@@ -47,11 +45,10 @@ const Start: React.FC<{ onNext?: () => void }> = ({ onNext }) => {
         <Text as="h3" className="md:text-2xl" leading="heading" size="xl" weight="bold">
           Getting paid
         </Text>
-        <img alt="Stripe Verified Partner Badge" src={StripeVerifiedBadge} />
       </div>
       <div className="mt-6 mb-7 text-pretty">
-        Stripe is our exclusive direct payments partner. Ghost collects <strong>no fees</strong> on
-        any payments! If you don’t have a Stripe account yet, you can{' '}
+        Stripe processes subscription payments through your connected account.
+        If you don’t have a Stripe account yet, you can{' '}
         <a
           className="underline"
           href="https://stripe.com"
@@ -174,7 +171,7 @@ const Connect: React.FC = () => {
       </Text>
       <div className="mt-2 mb-4">
         Click on the <strong>“Connect with Stripe”</strong> button to generate a secure key that
-        connects your Ghost site with Stripe.
+        connects your Frontro site with Stripe.
       </div>
       <StripeButton href={stripeConnectUrl} target="_blank" />
       <Text as="h6" className="mt-8 mb-2 text-base" tone="secondary" weight="semibold">
@@ -264,7 +261,7 @@ const Connected: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
       </div>
       <div className="my-20 flex flex-col items-center">
         <div className="relative h-20 w-[200px]">
-          <img alt="Ghost Logo" className="absolute left-10 size-16" src={GhostLogo} />
+          <img alt="Frontro Logo" className="absolute left-10 size-16" src={GhostLogo} />
           <img
             alt="Stripe Logo"
             className="absolute right-10 size-16 rounded-2xl shadow-[-1.5px_0_0_1.5px_#fff] dark:shadow-[-1.5px_0_0_1.5px_black]"
@@ -292,19 +289,19 @@ const Connected: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
           <div className="order-2 p-4 md:order-1">
             <div className="text-md font-semibold">How to setup and manage your Stripe account</div>
             <div className="mt-2 text-gray-800 dark:text-gray-500">
-              Learn how to configure your Stripe account to work with Ghost, from custom branding to
+              Learn how to configure your Stripe account to work with Frontro, from custom branding to
               payment receipt emails.
             </div>
             <div className="mt-3 flex items-center gap-1 text-gray-800 dark:text-gray-500">
-              <img alt="Ghost Logo" className="size-4" src={GhostLogoPink} />
-              <span className="font-semibold">Ghost Resources</span>
+              <img alt="Frontro Logo" className="size-4" src={GhostLogoPink} />
+              <span className="font-semibold">Stripe configuration guide</span>
             </div>
           </div>
           <div className="order-1 hidden w-[200px] shrink-0 items-center justify-center overflow-hidden md:visible! md:order-2 md:flex!">
             <img
               alt="Bookmark Thumb"
               className="min-h-full min-w-full shrink-0"
-              src={BookmarkThumb}
+              src={GhostLogo}
             />
           </div>
         </a>

@@ -293,7 +293,7 @@ class ExternalMediaInliner {
         status: 'failed',
         sourceUrl,
         stage: 'storage',
-        reason: 'The media file could not be stored in Ghost.',
+        reason: 'The media file could not be stored in Frontro.',
         error,
       };
     }

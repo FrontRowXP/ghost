@@ -31,11 +31,6 @@ function AboutModal() {
   const config = globalData.config;
   const upgradeStatus = useUpgradeStatus();
 
-  function copyrightYear(): number {
-    const date = new Date();
-    return date.getFullYear();
-  }
-
   function hasDeveloperExperiments(): boolean {
     if (config.enableDeveloperExperiments) {
       return true;
@@ -65,7 +60,7 @@ function AboutModal() {
       }}
     >
       <div className="flex flex-col gap-4 pb-7">
-        <GhostLogo className="h-auto w-[120px] dark:invert" />
+        <GhostLogo className="h-auto w-[160px]" />
         <div className="mt-3 flex flex-col gap-1.5">
           {upgradeStatus?.message && (
             <div className="gh-prose-links mb-4 rounded-sm border border-green p-5">
@@ -126,11 +121,11 @@ function AboutModal() {
           </a>
           <a
             className="flex items-center gap-2 hover:text-gray-900 dark:hover:text-gray-400"
-            href="https://forum.ghost.org/"
+            href="https://frontro.com/"
             rel="noopener noreferrer"
             target="_blank"
           >
-            <LucideIcon.CircleHelp className="size-4" /> Get help with Ghost
+            <LucideIcon.CircleHelp className="size-4" /> Get help with Frontro
           </a>
           <a
             className="flex items-center gap-2 hover:text-gray-900 dark:hover:text-gray-400"
@@ -143,34 +138,10 @@ function AboutModal() {
         </div>
         <Separator />
         <p className="max-w-[460px] text-sm">
-          Copyright © 2013 &ndash; {copyrightYear()} Ghost Foundation, released under the{' '}
-          <a
-            className="text-green"
-            href="https://github.com/TryGhost/Ghost/blob/main/LICENSE"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            MIT license
+          Frontro Gather is built with open-source software.{' '}
+          <a className="text-green" href="https://github.com/TryGhost/Ghost/blob/main/LICENSE" rel="noopener noreferrer" target="_blank">
+            Third-party license and copyright notices
           </a>
-          .{' '}
-          <a
-            className="text-green"
-            href="https://ghost.org/"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            Ghost
-          </a>{' '}
-          is a registered trademark of{' '}
-          <a
-            className="text-green"
-            href="https://ghost.org/trademark/"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            Ghost Foundation Ltd
-          </a>
-          .
         </p>
       </div>
     </SettingsModal>

@@ -121,7 +121,7 @@ const FeedItemMenu: React.FC<FeedItemMenuProps> = ({
           <AlertDialogTitle>Delete this post?</AlertDialogTitle>
           <AlertDialogDescription>
             {layout === 'inbox' ? (
-              'This will remove the post from the Ghost social web, but it will remain on your website.'
+              'This will remove the post from the Frontro social web, but it will remain on your website.'
             ) : (
               <>If you delete this post, you won&apos;t be able to restore it.</>
             )}

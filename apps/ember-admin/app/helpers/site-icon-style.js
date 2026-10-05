@@ -6,7 +6,7 @@ export default class SiteIconStyleHelper extends Helper {
     @inject config;
 
     compute() {
-        const icon = this.config.icon || 'https://static.ghost.org/v4.0.0/images/ghost-orb-2.png';
+        const icon = this.config.icon || '/ghost/assets/icons/ghost-orb.svg';
         return htmlSafe(`background-image: url(${icon})`);
     }
 }

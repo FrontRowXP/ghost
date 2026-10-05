@@ -50,7 +50,7 @@ export default class ProRoute extends AuthenticatedRoute {
 
     buildRouteInfoMetadata() {
         return {
-            titleToken: 'Ghost(Pro)'
+            titleToken: 'Billing'
         };
     }
 }

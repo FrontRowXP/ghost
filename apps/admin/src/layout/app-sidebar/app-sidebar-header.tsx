@@ -1,3 +1,4 @@
+import frontroIcon from '@/assets/img/frontro-icon.svg';
 import React from 'react';
 import { Badge, Button, Kbd, SidebarHeader } from '@tryghost/shade/components';
 import { LucideIcon } from '@tryghost/shade/utils';
@@ -13,7 +14,7 @@ function AppSidebarHeader({ ...props }: React.ComponentProps<typeof SidebarHeade
   const site = useBrowseSite();
   const settings = useBrowseSettings();
   const title = site.data?.site.title ?? '';
-  const siteIcon = site.data?.site.icon ?? 'https://static.ghost.org/v4.0.0/images/ghost-orb-1.png';
+  const siteIcon = site.data?.site.icon ?? frontroIcon;
   const isPrivate = getSettingValue<boolean>(settings.data?.settings, 'is_private') ?? false;
   const showSearch = currentUser && !isContributorUser(currentUser);
   const openGlobalSearch = useOpenGlobalSearch();

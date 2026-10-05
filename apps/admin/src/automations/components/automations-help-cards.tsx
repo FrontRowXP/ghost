@@ -104,7 +104,7 @@ const AutomationsHelpCards: React.FC = () => {
     <div className="mt-auto grid grid-cols-1 gap-6 pt-10 lg:grid-cols-2">
       <HelpLinkCard
         description="Learn how to set up automations, customize your emails, and get the most out of the beta."
-        title="Automations in Ghost"
+        title="Automations in Frontro"
         url={HELP_URL}
       >
         <AutomationsIconTile />

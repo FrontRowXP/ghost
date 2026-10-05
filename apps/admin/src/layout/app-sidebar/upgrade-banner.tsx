@@ -3,15 +3,15 @@ import { Banner, Button } from '@tryghost/shade/components';
 import { formatNumber } from '@tryghost/shade/utils';
 import { useBrowseConfig } from '@tryghost/admin-x-framework/api/config';
 
-import ghostProLogo from '@/assets/images/ghost-pro-logo.png';
-import ghostProLogoDark from '@/assets/images/ghost-pro-logo-dark.png';
+import ghostProLogo from '@/assets/img/frontro-logo-light.svg';
+import ghostProLogoDark from '@/assets/img/frontro-logo-dark.svg';
 
 const DAYS_PLACEHOLDER = '{{days}}';
 
 const DEFAULT_TITLE = 'Unlock every feature';
-const DEFAULT_MESSAGE = `Choose a plan to access the full power of Ghost right away, you have ${DAYS_PLACEHOLDER} free trial remaining.`;
+const DEFAULT_MESSAGE = `Choose a plan to access the full power of Frontro right away, you have ${DAYS_PLACEHOLDER} free trial remaining.`;
 const DEFAULT_UPGRADE_URL = '#/pro/billing/plans';
-const DEFAULT_LOGO_ALT = 'Ghost Pro';
+const DEFAULT_LOGO_ALT = 'Frontro';
 
 function UpgradeBanner({ trialDaysRemaining }: { trialDaysRemaining: number }) {
   const { data: config } = useBrowseConfig();
@@ -21,7 +21,7 @@ function UpgradeBanner({ trialDaysRemaining }: { trialDaysRemaining: number }) {
 
   const logo = bannerConfig?.logo || ghostProLogo;
   const logoDark = bannerConfig?.logoDark || bannerConfig?.logo || ghostProLogoDark;
-  // A host's own logo is not the Ghost(Pro) logo, so fall back to decorative rather than mislabelling it
+  // A host's custom logo may have its own label, so fall back to decorative rather than mislabelling it
   const logoAlt =
     bannerConfig?.logoAlt ?? (bannerConfig?.logo || bannerConfig?.logoDark ? '' : DEFAULT_LOGO_ALT);
 

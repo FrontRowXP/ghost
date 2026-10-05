@@ -68,7 +68,7 @@ const sessionService = createSessionService({
   getBlogLogo() {
     return (
       blogIcon.getIconUrl({ absolute: true, fallbackToDefault: false }) ||
-      'https://static.ghost.org/v4.0.0/images/ghost-orb-1.png'
+      'https://gather.frontro.com/public/frontro/icon.png'
     );
   },
   mailer,

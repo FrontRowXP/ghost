@@ -372,7 +372,7 @@ const Step3: React.FC = () => {
             <p className="tracking-tight text-gray-700 dark:text-gray-600">
               Follow-back your community to connect with them directly, or subscribe to your peers
               for inspiration to fuel your next idea. You now have a native{' '}
-              <span className="font-semibold text-black">social web reader</span> inside Ghost for
+              <span className="font-semibold text-black">social web reader</span> inside Frontro for
               keeping track of your favourite creators across different platforms.
             </p>
           </div>

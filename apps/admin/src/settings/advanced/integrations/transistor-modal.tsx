@@ -1,5 +1,5 @@
 import APIKeys from './api-keys';
-import BookmarkThumb from '@/settings/assets/images/integrations/ghost-transistor.png';
+import BookmarkThumb from '@/assets/img/frontro-icon.svg';
 import BrandIcon from '@/shared/brand-icon/brand-icon';
 import IntegrationHeader from './integration-header';
 import {
@@ -127,7 +127,7 @@ function TransistorModal() {
               <FieldContent>
                 <FieldLabel htmlFor="transistor-enabled">Enable Transistor</FieldLabel>
                 <FieldDescription>
-                  Connect your Ghost site with{' '}
+                  Connect your Frontro site with{' '}
                   <a
                     className="text-green"
                     href="https://transistor.fm"
@@ -172,9 +172,9 @@ function TransistorModal() {
               target="_blank"
             >
               <div className="order-2 px-7 py-5 md:order-1">
-                <div className="text-md font-semibold">How to use Transistor in Ghost</div>
+                <div className="text-md font-semibold">How to use Transistor in Frontro</div>
                 <div className="mt-1 text-gray-800 dark:text-gray-500">
-                  Learn more about connecting Transistor with Ghost to offer members access to
+                  Learn more about connecting Transistor with Frontro to offer members access to
                   private podcasts in Portal or as an embed in posts and pages with a custom
                   Transistor card.
                 </div>

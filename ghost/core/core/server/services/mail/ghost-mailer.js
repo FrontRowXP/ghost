@@ -10,7 +10,7 @@ const urlUtils = require('../../../shared/url-utils').default;
 const metrics = require('@tryghost/metrics');
 const emailAddress = require('../email-address');
 const messages = {
-  title: 'Ghost at {domain}',
+  title: 'Frontro at {domain}',
   checkEmailConfigInstructions: 'Please see {url} for instructions on configuring email.',
   failedSendingEmailError: 'Failed to send email.',
   incompleteMessageDataError: 'Incomplete message data.',

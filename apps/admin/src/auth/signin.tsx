@@ -18,8 +18,15 @@ import { describeUnexpectedError, useAuthClient } from './client/auth-client';
 import { AuthHeader, AuthLayout, FlowMessage, SubmitButton, type SubmitState } from './auth-layout';
 import { reloadAdmin } from './reload';
 import { takeSigninRedirect } from './signin-redirect';
+import FrontroSignin from './frontro/frontro-signin';
 
 export default function Signin() {
+  const { data } = useBrowseSite({ defaultErrorHandler: false });
+  if (data?.site.frontroAuth) return <FrontroSignin apiOrigin={data.site.frontroAuth.apiOrigin} />;
+  return <PasswordSignin />;
+}
+
+function PasswordSignin() {
   const authClient = useAuthClient();
   const navigate = useNavigate();
   const { data: siteData } = useBrowseSite({ defaultErrorHandler: false });

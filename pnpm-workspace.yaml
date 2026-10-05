@@ -37,6 +37,9 @@ allowBuilds:
   ssh2: false
 
 catalog:
+  framer-motion: 11.18.2
+  react-icons: 5.7.0
+  react-simple-phone-input: 5.2.1
   '@codemirror/autocomplete': 6.20.3
   '@codemirror/commands': 6.10.4
   '@codemirror/lang-css': 6.3.1

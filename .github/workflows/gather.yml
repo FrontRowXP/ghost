@@ -43,8 +43,14 @@ jobs:
       - name: Private NAS gateway boundary tests
         working-directory: ghost/core
         run: node --import=tsx --conditions=source --test scripts/gather-assets.test.mjs scripts/gather-origin.test.mjs
+      - name: Frontro staff authentication boundary tests
+        run: node --experimental-strip-types --test ghost/core/scripts/frontro-auth.test.cjs ghost/core/scripts/frontro-auth-client.test.cjs
+      - name: Install the isolated acceptance browser
+        run: pnpm --filter @tryghost/admin exec playwright install --with-deps chromium
+      - name: Frontro authentication and older-backend browser acceptance
+        run: pnpm --filter @tryghost/admin test:acceptance src/auth/frontro/frontro-signin.acceptance.test.tsx src/auth/signin.acceptance.test.tsx
       - name: Deployment qualification gate tests
-        run: python3 -m unittest discover -s infra/deployer -p test_watch.py
+        run: python3 -m unittest discover -s infra/deployer -p 'test_*.py'
       - name: Build the bundled public search frontend
         run: pnpm --filter @tryghost/sodo-search run build
       - name: Reject inherited publication workflows

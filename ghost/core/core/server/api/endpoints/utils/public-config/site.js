@@ -3,6 +3,7 @@ const settingsCache = require('../../../../../shared/settings-cache');
 const config = require('../../../../../shared/config');
 const urlUtils = require('../../../../../shared/url-utils').default;
 const labs = require('../../../../../shared/labs');
+const { publicConfiguration } = require('../../../../services/auth/frontro-auth');
 
 module.exports = function getSiteProperties() {
   const siteProperties = {
@@ -26,6 +27,12 @@ module.exports = function getSiteProperties() {
     // Admin's auth screens render before a session exists, so they can't read /config/ labs
     authReact: labs.isSet('authReact'),
   };
+
+  const frontroAuth = publicConfiguration(config.get('security:frontroAuth'));
+  if (frontroAuth) {
+    siteProperties.frontroAuth = frontroAuth;
+    siteProperties.authReact = true;
+  }
 
   if (config.get('client_sentry') && !config.get('client_sentry').disabled) {
     siteProperties.sentry_dsn = config.get('client_sentry').dsn;

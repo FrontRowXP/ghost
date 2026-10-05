@@ -121,3 +121,28 @@ The optional `gather-backup.timer` also runs the encrypted snapshot daily at
 Node executable path to use the pinned runtime. Check the first real run before
 enabling the timer and monitor service failures and disk reserve. Retention is
 operator-managed; the backup identity cannot delete snapshots.
+
+## Moments staff authentication
+
+Staff sign-in reuses the Moments API and modal. Configure
+`security.frontroAuth` as documented in
+`apps/admin/src/auth/frontro/README.md`; keep account links private.
+OAuth returns to `/ghost/` without a hash fragment. Link the verified Moments
+identity to an existing active Ghost staff account before enabling the feature.
+
+The API credential bundle currently sets `MOMENTS_ALLOWED_ORIGINS` through its
+OpenBao launcher. `infra/deployer/frontro_origins.py` can add the reviewed Gather
+and staging HTTPS origins after that launcher, preserving the existing secret
+projection and native executable. It refuses an overlapping rollout or an
+unexpected command. Run without `--apply` to review the exact patch, then apply
+through the authorized operator Kubernetes identity and wait for readiness:
+
+```sh
+python3 infra/deployer/frontro_origins.py --origin https://gather.frontro.com --origin https://gather-stage.frontro.com --apply
+kubectl -n moments-direct rollout status deployment/moments-api
+```
+
+This override is persistent in the API deployment; preserve it when reconciling
+private infrastructure. Never replace the OpenBao identity, copy its credentials,
+or expose its environment in logs. Qualify credentialed CORS, real email delivery,
+and the Google redirect independently before promoting Gather's auth change.

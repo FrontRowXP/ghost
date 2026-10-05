@@ -25,6 +25,8 @@ export const TINYBIRD_ORIGIN = 'https://tinybird.test';
  * `fakeEndpoint`. `isMatch` mirrors `pattern` for the in-flight ledger.
  */
 const EXTERNAL_URL_BLOCKLIST: Array<{ pattern: string; isMatch: (url: string) => boolean }> = [
+  // Frontro authentication must never reach real accounts from acceptance tests.
+  { pattern: 'https://api.moments.frontro.com/*', isMatch: url => url.startsWith('https://api.moments.frontro.com/') },
   // ghost.org, incl. the what's-new changelog feed (src/whats-new/hooks/use-changelog.ts)
   { pattern: 'https://ghost.org/*', isMatch: (url) => url.startsWith('https://ghost.org/') },
   // ActivityPub API root (admin-x-framework utils/helpers.ts)

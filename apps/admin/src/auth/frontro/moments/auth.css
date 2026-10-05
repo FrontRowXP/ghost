@@ -1,0 +1,33 @@
+@import 'react-simple-phone-input/dist/style.css';
+
+/* Layout only. The nugs card, icons, input and country picker retain their source classes. */
+.auth-screen{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:16px;color:#fff;background:#080b17}
+.auth-surface{font-family:'Inter Admin',Inter,sans-serif;font-size:16px;line-height:1.5;font-weight:400;--radius:8px}
+.auth-surface :where(h1,p){margin:0}
+.auth-surface :where(button,input){font-family:inherit;letter-spacing:normal}
+.auth-surface :where(button){cursor:pointer}
+.auth-surface :where(button:disabled){cursor:not-allowed}
+.auth-surface :where(button:focus-visible,a:focus-visible){outline:2px solid #fff;outline-offset:4px}
+.auth-primary{height:44px;padding:0;width:100%;border:0;border-radius:8px;background:#fff;color:#000;font-size:14px;font-weight:750}
+.auth-primary:hover:not(:disabled){background:#ffffffe6}
+.auth-primary:disabled{opacity:.5;cursor:not-allowed}
+.auth-code-input{height:48px;width:100%;border-radius:11px;border:1px solid #ffffff33;padding:0 14px;background:rgba(4,7,18,.58);color:#fff;font:inherit;font-size:14px}
+.auth-caption{font-size:11px;line-height:1.6;color:#ffffff80;margin-top:12px}
+.auth-error{margin-top:16px!important;padding:12px;border:1px solid #f8717140;background:#f871710e;border-radius:6px;color:#fca5a5;font-size:13px}
+.auth-text-button,.auth-code-actions button{border:0;background:none;color:#ffffffb3;font-size:12px;padding:6px}
+.auth-code-actions{display:flex;justify-content:center;margin-top:14px}
+.auth-connection-code{display:block;font:600 30px ui-monospace,monospace;letter-spacing:.12em;padding:20px;text-align:center}
+.auth-glass{max-width:440px;width:100%;padding:32px;border:1px solid #ffffff26;border-radius:26px;background:linear-gradient(145deg,rgba(13,18,35,.92),rgba(5,8,20,.78));color:#fff}
+.auth-glass h1{font-size:22px;margin:20px 0}.auth-glass p{font-size:14px;margin:12px 0}.auth-glass input{height:48px;width:100%;border:1px solid #ffffff33;border-radius:11px;background:#04071294;padding:0 14px;color:white}.auth-glass form{display:flex;flex-direction:column;gap:12px}.auth-logo{height:40px;width:auto}
+.auth-signout{margin:12px 0}.auth-signout p{color:#fca5a5;font-size:12px}
+/* Native <dialog> provides Escape, focus containment and inert marketing content. */
+.auth-marketing-dialog{padding:0;margin:0;border:0;width:100%;height:100%;max-width:none;max-height:none;background:transparent;color:#fff}
+.auth-marketing-dialog::backdrop{background:#0008;backdrop-filter:blur(4px)}
+.auth-marketing-dialog .auth-screen{background:transparent}
+
+/* React 18 compatible phone-picker 5.2 uses the same markup API with namespaced CSS. */
+.auth-surface [data-testid$="-country-select"]{margin-top:-12px}
+.auth-surface .simple-phone-input-sri198-dropdown:not(.active){display:none}
+.auth-surface .simple-phone-input-sri198-dropdown .simple-phone-input-sri198-search-container{background:#080b17!important}
+.auth-surface .simple-phone-input-sri198-dropdown input{background:#080b17;color:white;border:1px solid #ffffff33;border-radius:4px}
+.frontro-connection-error{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);width:min(440px,calc(100% - 32px));padding:12px;border:1px solid #f8717140;background:#180d17;border-radius:8px;color:#fca5a5;font:13px 'Inter Admin',sans-serif}

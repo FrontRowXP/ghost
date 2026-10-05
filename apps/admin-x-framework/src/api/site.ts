@@ -16,6 +16,8 @@ export type SiteData = {
   site_uuid: string;
   /** Whether Admin serves its React auth screens; absent on servers before the flag existed. */
   authReact?: boolean;
+  /** Present only when Core supports the Moments staff-session bridge. */
+  frontroAuth?: { apiOrigin: string };
 };
 
 export interface SiteResponseType {

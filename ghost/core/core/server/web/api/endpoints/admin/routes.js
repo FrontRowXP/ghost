@@ -438,6 +438,10 @@ module.exports = function apiRoutes() {
   router.get('/identities', mw.authAdminApi, http(api.identities.read));
 
   // ## Authentication
+  router.post('/authentication/frontro/start', shared.middleware.brute.globalBlock,
+    auth.session.initSession, http(api.authentication.frontroStart));
+  router.post('/authentication/frontro/complete', shared.middleware.brute.globalBlock,
+    auth.session.initSession, http(api.authentication.frontroComplete));
   router.post(
     '/authentication/password_reset',
     shared.middleware.brute.globalReset,

@@ -33,6 +33,8 @@
     "scripts/prune.mts",
     "scripts/gather-assets.mjs",
     "scripts/gather-ready.mjs",
+    "scripts/gather-supervisor.mjs",
+    "scripts/gather-worker-config.mjs",
     "types/",
     "index.js",
     "loggingrc.js",

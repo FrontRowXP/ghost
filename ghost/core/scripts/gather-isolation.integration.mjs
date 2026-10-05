@@ -56,6 +56,10 @@ test('97 shared tables enforce immutable login isolation, scoped uniqueness, rel
       await verifyTenantDatabase(runtime, id);
     }
     const [a, b] = runtimes;
+    await operator.raw('CREATE POLICY unintended_public_access ON ??.tags USING (true)', [namespace]);
+    await assert.rejects(verifyTenantDatabase(b, ids[1]), /policy differs/);
+    await operator.raw('DROP POLICY unintended_public_access ON ??.tags', [namespace]);
+    await verifyTenantDatabase(b, ids[1]);
     assert.equal((await a('settings').where({key: 'title'}).first()).value, 'Legacy');
     assert.equal((await b('settings')).length, 0);
     await b('settings').insert(record('settings', {key: 'title', value: 'Other'}));

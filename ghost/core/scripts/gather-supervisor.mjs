@@ -10,7 +10,8 @@ import {deriveTenantCredential, workerConfiguration} from './gather-worker-confi
 
 const require = createRequire(import.meta.url);
 
-export async function startSupervisor() {
+export async function startSupervisor(testOptions = {}) {
+  if (Object.keys(testOptions).length && process.env.GATHER_DISPOSABLE_CI !== '1') throw new Error('Supervisor dependency overrides are disposable-CI only');
   const config = require('../core/shared/config');
   const settings = config.get('gather:sharedTenancy');
   const template = config.get();
@@ -133,9 +134,13 @@ export async function startSupervisor() {
           const challenge = randomBytes(32).toString('hex');
           challenges.set(domain.hostname, challenge);
           try {
-            const response = await fetch('https://' + domain.hostname + '/_gather/domain/' + challenge, {redirect: 'error', signal: AbortSignal.timeout(8000)});
-            const body = await response.text();
-            if (response.status !== 200 || body !== challenge) throw new Error('Site HTTPS route is not verified');
+            if (testOptions.verifyDomain) {
+              await testOptions.verifyDomain(domain.hostname, challenge);
+            } else {
+              const response = await fetch('https://' + domain.hostname + '/_gather/domain/' + challenge, {redirect: 'error', signal: AbortSignal.timeout(8000)});
+              const body = await response.text();
+              if (response.status !== 200 || body !== challenge) throw new Error('Site HTTPS route is not verified');
+            }
           } finally {challenges.delete(domain.hostname);}
           await database.transaction(async tx => {
             await tx('gather_site_staff').insert({id: randomBytes(16).toString('hex'), site_id: site.id, subject_id: site.created_by, staff_id: ownerStaffId}).onConflict(['site_id', 'subject_id']).ignore();

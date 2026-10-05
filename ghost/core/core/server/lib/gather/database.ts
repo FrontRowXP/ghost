@@ -2,9 +2,10 @@ import errors from '@tryghost/errors';
 import { createHash } from 'node:crypto';
 import type { Knex } from 'knex';
 import tables from './tenant-tables.json';
+const canonicalSchema = require('../../data/schema/schema');
 
 export const TENANT_TABLES: readonly string[] = Object.freeze(tables);
-export const TENANT_MANIFEST_HASH = createHash('sha256').update(JSON.stringify(tables)).digest('hex');
+export const TENANT_MANIFEST_HASH = createHash('sha256').update(JSON.stringify({tables, schema: canonicalSchema})).digest('hex');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ROLE = /^[a-z_][a-z0-9_]{0,62}$/;
 const PLATFORM = ['gather_sites', 'gather_site_domains', 'gather_site_staff', 'gather_tenancy_state'];
@@ -37,6 +38,8 @@ export async function installTenantIsolation(database: Knex, legacySiteId: strin
     if (version < 160000 || owner === controlRole) {
       throw new errors.IncorrectUsageError({ message: 'Tenancy requires PostgreSQL 16 and a separate migration owner' });
     }
+    const operator = await tx.raw('SELECT rolsuper, rolcreaterole FROM pg_roles WHERE rolname=current_user');
+    if (!operator.rows[0]?.rolsuper && !operator.rows[0]?.rolcreaterole) throw new errors.IncorrectUsageError({message: 'The migration owner must be able to issue constrained runtime roles'});
     const control = await tx.raw('SELECT rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolinherit, rolreplication FROM pg_roles WHERE rolname = ?', [controlRole]);
     if (!control.rows.length || Object.values(control.rows[0]).some(Boolean)) {
       throw new errors.IncorrectUsageError({ message: 'The control role must not have administrative database privileges' });
@@ -186,6 +189,7 @@ export async function installTenantIsolation(database: Knex, legacySiteId: strin
     await tx.raw('CREATE POLICY gather_staff_control ON ??.gather_site_staff TO ?? USING (true) WITH CHECK (true)', [schema, controlRole]);
     await tx.raw('CREATE POLICY gather_staff_maintenance ON ??.gather_site_staff TO ?? USING (true) WITH CHECK (true)', [schema, owner]);
     await tx.raw('GRANT USAGE ON SCHEMA ?? TO ??', [schema, controlRole]);
+    await tx.raw('REVOKE CREATE ON SCHEMA ?? FROM PUBLIC', [schema]);
     // Only this constrained function can create runtime identities. Control has
     // no CREATE ROLE, database ownership, RLS bypass, or publication write grant.
     const schemaLiteral = schema.replaceAll("'", "''");
@@ -244,14 +248,25 @@ export async function verifyTenantDatabase(database: Knex, siteId: string) {
   const inventory = await database.raw(`SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity,
     pg_get_userbyid(c.relowner)=current_user AS owned FROM pg_class c
     JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=current_schema() AND c.relkind='r'`);
+  const policies = await database.raw(`SELECT c.relname, p.polname, p.polcmd, p.polpermissive,
+    pg_get_expr(p.polqual, p.polrelid) AS predicate, pg_get_expr(p.polwithcheck, p.polrelid) AS assertion
+    FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname=current_schema() AND EXISTS (SELECT 1 FROM unnest(p.polroles) role WHERE role=0 OR role=(SELECT oid FROM pg_roles WHERE rolname=current_user))`);
+  const safeExpression = (value: string) => /^site_id(?:::text)?=(?:[a-z0-9_]+\.)?gather_current_site$/.test((value || '').replace(/[\s()"']/g, ''));
   for (const table of tables) {
     const row = inventory.rows.find((item: any) => item.relname === table);
     if (!row || !row.relrowsecurity || !row.relforcerowsecurity || row.owned) {
       throw new errors.IncorrectUsageError({ message: 'A publishing table is not isolated' });
+    }
+    const applicable = policies.rows.filter((policy: any) => policy.relname === table);
+    if (applicable.length !== 1 || applicable[0].polname !== 'gather_tenant' || applicable[0].polcmd !== '*' || !applicable[0].polpermissive || !safeExpression(applicable[0].predicate) || !safeExpression(applicable[0].assertion)) {
+      throw new errors.IncorrectUsageError({message: 'A publishing policy differs from the fixed-login boundary'});
     }
     const dangerous = await database.raw("SELECT has_table_privilege(current_user, ?, 'TRUNCATE') AS truncate, has_schema_privilege(current_user, current_schema(), 'CREATE') AS create", [table]);
     if (dangerous.rows[0].truncate || dangerous.rows[0].create) {
       throw new errors.IncorrectUsageError({ message: 'Tenant runtime has unsafe database privileges' });
     }
   }
+  const views = await database.raw("SELECT c.relname, c.reloptions FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=current_schema() AND c.relkind='v'");
+  if (views.rows.length !== 1 || views.rows[0].relname !== 'members_resolved_subscription' || !views.rows[0].reloptions?.includes('security_invoker=true')) throw new errors.IncorrectUsageError({message: 'Publication view isolation differs from the audited inventory'});
 }

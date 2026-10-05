@@ -50,7 +50,7 @@ jobs:
       - name: Frontro authentication and older-backend browser acceptance
         run: pnpm --filter @tryghost/admin test:acceptance src/auth/frontro/frontro-signin.acceptance.test.tsx src/auth/signin.acceptance.test.tsx
       - name: Deployment qualification gate tests
-        run: python3 -m unittest discover -s infra/deployer -p test_watch.py
+        run: python3 -m unittest discover -s infra/deployer -p 'test_*.py'
       - name: Build the bundled public search frontend
         run: pnpm --filter @tryghost/sodo-search run build
       - name: Reject inherited publication workflows

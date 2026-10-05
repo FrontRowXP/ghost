@@ -44,7 +44,7 @@ jobs:
         working-directory: ghost/core
         run: node --import=tsx --conditions=source --test scripts/gather-assets.test.mjs scripts/gather-origin.test.mjs
       - name: Frontro staff authentication boundary tests
-        run: node --experimental-strip-types --test ghost/core/scripts/frontro-auth.test.cjs ghost/core/scripts/frontro-auth-client.test.cjs
+        run: node --experimental-strip-types --test ghost/core/scripts/frontro-auth.test.cjs ghost/core/scripts/frontro-auth-client.test.cjs ghost/core/scripts/frontro-auth-serialization.test.cjs
       - name: Install the isolated acceptance browser
         run: pnpm --filter @tryghost/admin exec playwright install --with-deps chromium
       - name: Frontro authentication and older-backend browser acceptance

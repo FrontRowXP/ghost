@@ -16,8 +16,11 @@ function setup({ active = true, linked = true } = {}) {
   const calls = [];
   let clock = 100;
   let failMe = false;
-  const req = { session: session(), get: () => origin };
-  const res = { set() {}, json(value) { this.body = value; } };
+  let cookies = '';
+  const req = { session: { save() { throw new Error('Anonymous Ghost sessions require a staff user ID'); } }, get: name => name === 'cookie' ? cookies : origin };
+  const res = { set() {}, json(value) { this.body = value; },
+    cookie(name, value, options) { cookies = name + '=' + value; this.binding = { value, options }; },
+    clearCookie() { cookies = ''; } };
   const user = { id: 'staff-id', get: key => key === 'status' ? active ? 'active' : 'inactive' : null };
   let assigned = 0;
   const bridge = createFrontroAuth({
@@ -56,7 +59,12 @@ test('one-use handoff stays server-side and issues only a linked staff session',
   const t = setup();
   await t.bridge.start(t.req, t.res);
   assert.deepEqual(t.res.body, { id, code: 'ABCD1234' });
-  assert.equal(t.req.session.frontroHandoff.secret, secret);
+  assert.equal(t.req.session.frontroHandoff, undefined);
+  assert.match(t.res.binding.value, /^[0-9a-f]{64}$/);
+  assert.notEqual(t.res.binding.value, secret);
+  assert.equal(t.res.binding.options.httpOnly, true);
+  assert.equal(t.res.binding.options.secure, true);
+  assert.equal(t.res.binding.options.maxAge, 600000);
   await t.bridge.complete(t.req, t.res);
   assert.equal(t.assigned(), 1);
   assert.deepEqual(t.res.body, { authenticated: true });
@@ -82,15 +90,37 @@ for (const options of [{ linked: false }, { active: false }]) {
 
 test('rejects login CSRF before any API request, and rejects expired handoffs', async () => {
   const t = setup();
+  const originalGet = t.req.get;
   t.req.get = () => 'https://attacker.example';
   await assert.rejects(t.bridge.start(t.req, t.res), { statusCode: 403 });
   await assert.rejects(t.bridge.complete(t.req, t.res), { statusCode: 403 });
   assert.equal(t.calls.length, 0);
-  t.req.get = () => origin;
+  t.req.get = originalGet;
   await t.bridge.start(t.req, t.res);
   t.expire();
   await assert.rejects(t.bridge.complete(t.req, t.res), { statusCode: 401 });
   assert.equal(t.calls.length, 1);
+});
+
+test('a browser binding cannot complete another server instance or another browser handoff', async () => {
+  const first = setup();
+  const second = setup();
+  await first.bridge.start(first.req, first.res);
+  await assert.rejects(first.bridge.complete(second.req, second.res), { statusCode: 401 });
+  await assert.rejects(second.bridge.complete(first.req, first.res), { statusCode: 401 });
+  assert.equal(first.assigned(), 0);
+  assert.equal(second.assigned(), 0);
+});
+
+test('pending starts are bounded and expired capacity is reclaimed', async () => {
+  const t = setup();
+  const anonymous = { get: name => name === 'cookie' ? '' : origin };
+  await Promise.all(Array.from({ length: 1000 }, () => t.bridge.start(anonymous, t.res)));
+  await assert.rejects(t.bridge.start(anonymous, t.res), { statusCode: 429 });
+  assert.equal(t.calls.length, 1000);
+  t.expire();
+  await t.bridge.start(anonymous, t.res);
+  assert.equal(t.calls.length, 1001);
 });
 
 test('checks the provider and current staff mapping on protected requests', async () => {

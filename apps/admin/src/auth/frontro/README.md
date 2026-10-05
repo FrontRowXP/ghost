@@ -15,6 +15,12 @@ the browser payload. Core resolves the returned immutable account ID against an
 operator-managed staff map and rotates Ghost's session using its existing SSO
 session service. It never grants a role or creates staff from an email address.
 
+Before staff identification, Core keeps at most 1,000 pending handoffs in its
+singleton process for ten minutes, bound to an opaque Secure/HttpOnly cookie.
+It never writes an anonymous row to Ghost's staff-only session table. Restarting
+Core expires pending login attempts; the browser starts a fresh handoff. Keep
+Core a singleton until a shared handoff store is implemented and qualified.
+
 Core advertises `site.frontroAuth` only when configured. That is the capability
 check; older backends keep their existing password screen. The current Moments
 API must explicitly allow the Gather HTTPS origin in `MOMENTS_ALLOWED_ORIGINS`

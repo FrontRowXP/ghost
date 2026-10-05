@@ -107,7 +107,16 @@ try {
         await request('/ghost/api/admin/authentication/frontro/complete/', {
             method: 'POST', body: '{}', expected: 401, authenticated: false
         });
-        console.log('Moments capability published and anonymous session completion denied.');
+        const start = await request('/ghost/api/admin/authentication/frontro/start/', {
+            method: 'POST', body: '{}', authenticated: false
+        });
+        const handoff = await start.json();
+        const binding = start.headers.getSetCookie().find(value => value.startsWith('__Secure-frontro-handoff='));
+        if (!/^[0-9a-f-]{36}$/i.test(handoff.id) || !/^[A-Z0-9_-]{8}$/.test(handoff.code) ||
+            Object.keys(handoff).sort().join(',') !== 'code,id' || !binding?.includes('HttpOnly') || !binding.includes('Secure')) {
+            throw new Error('Anonymous Moments handoff failed or exposed an invalid browser binding');
+        }
+        console.log('Moments handoff started with an opaque binding; anonymous completion denied.');
     }
     for (const [file, mime] of [['sodo-search.min.js', 'application/javascript'], ['main.css', 'text/css']]) {
         const asset = await request(`/public/gather-search/${file}`, {authenticated: false});

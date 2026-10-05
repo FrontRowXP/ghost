@@ -2,6 +2,8 @@
 // stay at Moments; only its one-use handoff is exchanged by this server.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TOKEN = /^[0-9a-f]{64}$/i;
+const { randomBytes } = require('node:crypto');
+const BINDING_COOKIE = '__Secure-frontro-handoff';
 
 function failure(statusCode, code) {
   const error = new Error(code);
@@ -30,9 +32,23 @@ function readCookie(headers, name) {
 
 module.exports.publicConfiguration = publicConfiguration;
 module.exports.createFrontroAuth = function createFrontroAuth({
-  getConfig, getAdminOrigin, getSession, findUserById, createSession,
+  getConfig, getAdminOrigin, getAdminPath = () => '/ghost', findUserById, createSession,
   fetch: request = globalThis.fetch, now = Date.now,
 }) {
+  // Gather Core is a singleton. A restart intentionally expires pending login
+  // attempts; authenticated sessions continue in Ghost's persistent store.
+  const handoffs = new Map();
+  const cookieOptions = () => ({ secure: true, httpOnly: true, sameSite: 'lax', path: getAdminPath() });
+  function binding(req) {
+    const cookies = (req.get('cookie') || '').split(';').map(value => value.trim())
+      .filter(value => value.startsWith(BINDING_COOKIE + '='));
+    const value = cookies.length === 1 ? cookies[0].slice(BINDING_COOKIE.length + 1) : '';
+    return TOKEN.test(value) ? value : null;
+  }
+  function discard(req, res) {
+    handoffs.delete(binding(req));
+    res.clearCookie(BINDING_COOKIE, cookieOptions());
+  }
   function configuration() {
     const config = getConfig();
     const publicConfig = publicConfiguration(config);
@@ -87,29 +103,40 @@ module.exports.createFrontroAuth = function createFrontroAuth({
 
   async function start(req, res) {
     sameOrigin(req);
-    const session = await getSession(req, res);
-    const { data, headers } = await call('/auth/handoffs', { body: {} });
+    for (const [key, value] of handoffs) {
+      if (value.expiresAt <= now()) handoffs.delete(key);
+    }
+    handoffs.delete(binding(req));
+    if (handoffs.size >= 1000) throw failure(429, 'frontro_auth_busy');
+    const token = randomBytes(32).toString('hex');
+    // Reserve before awaiting the provider so concurrent starts stay bounded.
+    handoffs.set(token, { expiresAt: now() + 600000 });
+    let result;
+    try { result = await call('/auth/handoffs', { body: {} }); }
+    catch (error) { handoffs.delete(token); throw error; }
+    const { data, headers } = result;
     if (!UUID.test(data?.id) || !TOKEN.test(data?.secret) || !/^[A-Z0-9_-]{8}$/.test(data?.code) || data?.expiresIn !== 600) {
+      handoffs.delete(token);
       throw failure(503, 'frontro_auth_unavailable');
     }
-    session.frontroHandoff = {
-      id: data.id, secret: data.secret, cookie: readCookie(headers, '__Host-moments_flow'),
-      expiresAt: now() + 600000,
-    };
-    await new Promise((resolve, reject) => session.save(error => error ? reject(error) : resolve()));
+    try {
+      handoffs.set(token, {
+        id: data.id, secret: data.secret, cookie: readCookie(headers, '__Host-moments_flow'),
+        expiresAt: now() + 600000,
+      });
+      res.cookie(BINDING_COOKIE, token, { ...cookieOptions(), maxAge: 600000 });
+    } catch (error) { handoffs.delete(token); throw error; }
     res.set('Cache-Control', 'no-store');
     res.json({ id: data.id, code: data.code });
   }
 
   async function complete(req, res) {
     sameOrigin(req);
-    const session = await getSession(req, res);
-    const handoff = session.frontroHandoff;
-    if (!handoff || handoff.expiresAt <= now()) throw failure(401, 'frontro_handoff_expired');
+    const handoff = handoffs.get(binding(req));
     // Consume our browser binding before the upstream exchange, including on
     // failure. Retrying a lost response requires a fresh handoff, never a grant.
-    delete session.frontroHandoff;
-    await new Promise((resolve, reject) => session.save(error => error ? reject(error) : resolve()));
+    discard(req, res);
+    if (!handoff?.id || handoff.expiresAt <= now()) throw failure(401, 'frontro_handoff_expired');
     const { data, headers } = await call('/auth/handoffs/' + handoff.id + '/exchange', {
       cookie: handoff.cookie, body: { secret: handoff.secret },
     });
@@ -158,5 +185,5 @@ module.exports.createFrontroAuth = function createFrontroAuth({
     catch { /* Always permit local logout even if Moments is unavailable. */ }
   }
 
-  return { start, complete, validate, revoke };
+  return { start, complete, validate, revoke, discard };
 };

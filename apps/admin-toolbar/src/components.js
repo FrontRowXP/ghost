@@ -238,7 +238,7 @@ export function Toolbar({ config, user }) {
             '--gh-admin-toolbar-expanded-width': `${expandedSize?.width || 178}px`,
           }
         : null,
-      'aria-label': 'Ghost admin toolbar',
+      'aria-label': 'Frontro admin toolbar',
     },
     [
       h(

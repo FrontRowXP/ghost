@@ -3,6 +3,7 @@ const {
   addTable,
   combineNonTransactionalMigrations,
 } = require('../../utils');
+const { InternalServerError } = require('@tryghost/errors');
 // Frozen inventory. Enabling forced row isolation is an explicit operator rollout.
 const tables = [
   'newsletters',
@@ -142,9 +143,10 @@ module.exports = {
       (await config.connection.schema.hasTable('gather_tenancy_state')) &&
       (await config.connection('gather_tenancy_state').where({ key: 'isolation' }).first())
     ) {
-      throw new Error(
-        'Installed tenant isolation requires an explicit database restore; refusing to remove site boundaries',
-      );
+      throw new InternalServerError({
+        message:
+          'Installed tenant isolation requires an explicit database restore; refusing to remove site boundaries',
+      });
     }
     return migration.down(config);
   },

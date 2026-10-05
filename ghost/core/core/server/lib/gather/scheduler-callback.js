@@ -1,3 +1,5 @@
+const { InternalServerError } = require('@tryghost/errors');
+
 // Scheduler tokens retain their canonical audience. Only the transport changes
 // to this fixed worker; no callback may select a sibling site or remote target.
 exports.tenantCallback = function tenantCallback(url, config) {
@@ -21,7 +23,9 @@ exports.tenantCallback = function tenantCallback(url, config) {
     typeof secret !== 'string' ||
     secret.length < 48
   ) {
-    throw new Error('A tenant scheduler callback must address its fixed Admin runtime');
+    throw new InternalServerError({
+      message: 'A tenant scheduler callback must address its fixed Admin runtime',
+    });
   }
   return {
     url: `http://127.0.0.1:${port}${target.pathname}${target.search}`,

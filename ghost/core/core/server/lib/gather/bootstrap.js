@@ -1,11 +1,12 @@
 const { randomBytes } = require('node:crypto');
+const { InternalServerError } = require('@tryghost/errors');
 
 // Runs in a fixed-role worker. Every write, including fixture relations, is
 // enforced by PostgreSQL. The owner ID is durable before this worker starts.
 exports.bootstrapTenant = async function bootstrapTenant(config, database) {
   const tenant = config.get('gather:tenant');
   if (!/^[a-f0-9]{24}$/.test(tenant.ownerStaffId) || !/^[a-f0-9-]{36}$/.test(tenant.ownerSubject)) {
-    throw new Error('Invalid provisioned owner binding');
+    throw new InternalServerError({ message: 'Invalid provisioned owner binding' });
   }
   const models = require('../../models');
   const { FixtureManager } = require('../../data/schema/fixtures');

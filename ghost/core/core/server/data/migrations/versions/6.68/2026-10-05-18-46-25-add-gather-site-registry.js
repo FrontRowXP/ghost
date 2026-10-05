@@ -1,4 +1,5 @@
 const { addTable, combineNonTransactionalMigrations } = require('../../utils');
+const { InternalServerError } = require('@tryghost/errors');
 // Frozen migration definition: do not load the current schema here.
 const tables = {
   gather_sites: {
@@ -115,7 +116,9 @@ module.exports.down = async function down(options) {
     (await options.connection.schema.hasTable('gather_tenancy_state')) &&
     (await options.connection('gather_tenancy_state').where({ key: 'isolation' }).first())
   ) {
-    throw new Error('Shared tenancy is installed; refusing to remove the site registry');
+    throw new InternalServerError({
+      message: 'Shared tenancy is installed; refusing to remove the site registry',
+    });
   }
   return removeRegistry(options);
 };

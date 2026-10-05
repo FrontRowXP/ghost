@@ -29,8 +29,8 @@ export function generateUuid() {
 export function getSiteData({
   title = 'The Blueprint',
   description = 'Thoughts, stories and ideas.',
-  logo = 'https://static.ghost.org/v4.0.0/images/ghost-orb-1.png',
-  icon = 'https://static.ghost.org/v4.0.0/images/ghost-orb-1.png',
+  logo = 'https://gather.frontro.com/_assets/content/images/2026/10/frontro-icon-180.png',
+  icon = 'https://gather.frontro.com/_assets/content/images/2026/10/frontro-icon-180.png',
   url = 'https://portal.localhost',
   plans = {
     monthly: 5000,

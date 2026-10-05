@@ -1,10 +1,10 @@
+import frontroIcon from '@/assets/img/frontro-icon.svg';
 import { type CSSProperties, type ReactNode } from 'react';
 import { useBrowseSite } from '@tryghost/admin-x-framework/api/site';
 import { Button, LoadingIndicator } from '@tryghost/shade/components';
 import { Stack } from '@tryghost/shade/primitives';
 import { cn } from '@tryghost/shade/utils';
 
-const GHOST_ORB = 'https://static.ghost.org/v4.0.0/images/ghost-orb-2.png';
 
 /**
  * Full-page frame for the auth screens. Settings are unreadable before sign
@@ -31,7 +31,7 @@ export function AuthHeader({ title, children }: { title: ReactNode; children?: R
 
   return (
     <header className="mb-4 flex flex-col items-center gap-5 text-center">
-      <img alt="" className="size-18 rounded-sm" src={data?.site.icon || GHOST_ORB} />
+      <img alt="" className="size-18 rounded-sm" src={data?.site.icon || frontroIcon} />
       <h1 className="text-4xl leading-tight font-bold tracking-tight text-foreground">{title}</h1>
       {children}
     </header>

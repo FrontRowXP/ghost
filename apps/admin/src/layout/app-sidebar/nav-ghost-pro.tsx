@@ -36,7 +36,7 @@ function NavGhostPro({ ...props }: React.ComponentProps<typeof SidebarGroup>) {
             <NavMenuItem>
               <NavMenuItem.Link to="pro">
                 <LucideIcon.CreditCard />
-                <NavMenuItem.Label>Ghost(Pro)</NavMenuItem.Label>
+                <NavMenuItem.Label>Billing</NavMenuItem.Label>
               </NavMenuItem.Link>
             </NavMenuItem>
           )}

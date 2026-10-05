@@ -83,6 +83,7 @@ jobs:
           GATHER_DISPOSABLE_CI: '1'
         run: |
           node --import=tsx --conditions=source --test scripts/gather-tenancy.test.mjs scripts/gather-registry.integration.mjs
+          node --test scripts/gather-sites-api.test.cjs
           pnpm exec vitest run test/unit/server/data/schema/integrity.test.ts test/unit/server/data/exporter/index.test.js --maxWorkers=2
           pnpm exec vitest run -c vitest.config.db.ts --project e2e-api test/e2e-api/admin/gather-sites.test.js test/e2e-api/admin/frontro-auth.test.js --maxWorkers=2
       - name: Install the isolated acceptance browser
